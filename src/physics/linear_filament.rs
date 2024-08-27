@@ -510,7 +510,6 @@ mod test {
             let mut outy = [0.0];
             let mut outz = [0.0];
 
-            // Vector potential, either serial or parallel variant
             vector_potential_linear_filament(
                 (&[x], &[y], &[z]),
                 (&xyz, &xyz, &xyz),
