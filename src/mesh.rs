@@ -232,26 +232,26 @@ pub fn rotate_filaments_about_path(
 }
 
 /// Convenience function for taking the dot product of two vectors stored as tuples
-#[inline(always)]
+#[inline]
 fn tupledot(a: (f64, f64, f64), b: (f64, f64, f64)) -> f64 {
     dot3(a.0, a.1, a.2, b.0, b.1, b.2)
 }
 
 /// Convenience function for taking the magnitude of a vector stored as a tuple
-#[inline(always)]
+#[inline]
 fn tuplerss(a: (f64, f64, f64)) -> f64 {
     rss3(a.0, a.1, a.2)
 }
 
 /// Convenience function for normalizing a vector stored as a tuple
-#[inline(always)]
+#[inline]
 fn tuplenormalize(a: (f64, f64, f64)) -> (f64, f64, f64) {
     let mag = tuplerss(a);
     (a.0 / mag, a.1 / mag, a.2 / mag)
 }
 
 /// Convenience function for taking the cross product of two vectors stored as tuples
-#[inline(always)]
+#[inline]
 fn tuplecross(a: (f64, f64, f64), b: (f64, f64, f64)) -> (f64, f64, f64) {
     cross3(a.0, a.1, a.2, b.0, b.1, b.2)
 }

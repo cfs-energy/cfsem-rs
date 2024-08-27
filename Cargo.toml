@@ -1,6 +1,6 @@
 [package]
 name = "cfsem"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["Commonwealth Fusion Systems <jlogan@cfs.energy>"]
 license = "MIT OR Apache-2.0"
@@ -25,7 +25,7 @@ codegen-units = 1
 overflow-checks = true
 
 [[bench]]
-name = "biotsavart"
+name = "linear_filament"
 harness = false
 
 [[bench]]
