@@ -21,7 +21,7 @@ use crate::{MU0_OVER_4PI, MU_0};
 /// * `zfil`:    (m) z-coord of each filament, length `m`
 /// * `rprime`:  (m) r-coord of each observation point, length `n`
 /// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_psi`: (Wb) or (H) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
+/// * `out_psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
 ///
 /// # Commentary
 ///
@@ -82,7 +82,7 @@ pub fn flux_circular_filament_par(
 /// * `zfil`:    (m) z-coord of each filament, length `m`
 /// * `rprime`:  (m) r-coord of each observation point, length `n`
 /// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_psi`: (Wb) or (H) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
+/// * `out_psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
 ///
 /// # Commentary
 ///
@@ -132,6 +132,8 @@ pub fn flux_circular_filament(
             let z_minus_zprime = zfil[j] - zprime[i];
             let k2 = 4.0 * rrprime / (r_plus_rprime.powi(2) + z_minus_zprime.powi(2));
 
+            // The contributions added here have units of ampere meter,
+            // but the sum will have units of weber after it is multiplied by mu_0 below.
             out_psi[i] +=
                 ifil[j] * (rrprime / k2).sqrt() * ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2));
         }
@@ -310,6 +312,8 @@ pub fn flux_density_circular_filament(
             let hz = a0 * s_over_q.mul_add(rfil2 - r2 - z2, f);
 
             // Magnetic flux density assuming vacuum permeability
+            // The contributions added here have units of ampere per meter,
+            // but the result will have units of tesla after it is multiplied by mu_0 / (4 * pi) below.
             out_r[j] += hr;
             out_z[j] += hz;
         }
@@ -419,7 +423,8 @@ pub fn vector_potential_circular_filament(
 
     for i in 0..n {
         for j in 0..m {
-            // Adjust from spherical coordinates
+            // Eq. 1 and 2 of Simpson2001 give a formula for the vector potential of a loop in spherical coordinates.
+            // Here, we use that formula adjusted to cylindrical coordinates.
             // r_spherical*sin(theta) = r_cylindrical
             // r_spherical^2 = r_cylindrical^2 + z^2
             let z = zprime[j] - zfil[i]; // [m]

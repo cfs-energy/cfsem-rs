@@ -272,6 +272,8 @@ pub fn flux_density_linear_filament(
 
             // Sum up the contributions at each observation point on each axis
             // using fused multiply-add again to reduce roundoff error and slightly improve speed
+            // The B-field contributions added here *do not* have units of tesla,
+            // but the sum will have units of tesla after it is multiplied by mu_0 / (4 * pi) below.
             bx[j] = c.mul_add(cx, bx[j]);
             by[j] = c.mul_add(cy, by[j]);
             bz[j] = c.mul_add(cz, bz[j]);
@@ -398,7 +400,10 @@ pub fn vector_potential_linear_filament(
 
             let c = current / rnorm;
 
-            ax[j] = c.mul_add(dlxi, ax[j]); // [V-s/m]
+            // The contributions added here have units of amperes,
+            // but the sum will have units of volt second per meter after being multiplied
+            // by mu_0 / (4 * pi) below.
+            ax[j] = c.mul_add(dlxi, ax[j]);
             ay[j] = c.mul_add(dlyi, ay[j]);
             az[j] = c.mul_add(dlzi, az[j])
         }
@@ -479,6 +484,13 @@ mod test {
             (outx, outy, outz),
         )
         .unwrap();
+        // Here the mutual inductance of the two filaments is calculated from the
+        // vector potential at filament 2 due to 1 ampere of current flowing in filament 1.
+        // By Stokes' theorem, the line integral of A over filament 2 is equal to the
+        // magnetic flux through a surface bounded by filament 2. The flux through
+        // filament 2 due to 1 ampere of current in filament 1 is the mutual inductance.
+        // (We are stretching the applicability of Stokes' therorem because the filaments
+        // are not closed loops)
         let a_dot_dl: Vec<f64> = (0..NFIL - 1)
             .map(|i| outx[i] * dlxfil2[i] + outy[i] * dlyfil2[i] + outz[i] * dlzfil2[i])
             .collect();
@@ -521,8 +533,8 @@ mod test {
         for x in vals.iter() {
             for y in vals.iter() {
                 for z in vals.iter() {
-                    let y = &(y + 1e-2); // Slightly adjust to avoid nans
-                    let x = &(x + 1e-2);
+                    let x = &(x + 1e-2); // Slightly adjust to avoid nans
+                    let y = &(y + 1e-2);
                     let z = &(z - 1e-2);
 
                     // Brute-force jac because we're only using it once
