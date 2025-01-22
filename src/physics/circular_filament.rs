@@ -6,7 +6,7 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{ellipe, ellipk, rss3};
+use crate::math::{dot3, ellipe, ellipk, rss3};
 
 use crate::{MU0_OVER_4PI, MU_0};
 
@@ -615,12 +615,11 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     //    phi = tan^-1(y/x)
     let path_phi0 = f64::atan2(xyzfil0.1, xyzfil0.0);
     let path_phi1 = f64::atan2(xyzfil1.1, xyzfil1.0);
-    let path_dphi = path_phi1 - path_phi0;
 
     //    midpoint is best for capturing curvature in piecewise-linear paths properly
     let path_r_mid = path_r + path_dr / 2.0; // [m]
     let path_z_mid = xyzfil0.2 + dlzfil / 2.0; // [m]
-    let path_dlphi = path_r_mid * path_dphi; // [m] length in phi-direction; 2*pi cancels out
+    let path_phi_mid = (path_phi0 + path_phi1) / 2.0;
 
     // Get cylindrical vector potential at linear segment midpoint
     // for a unit current, which is equivalent to mutual inductance per unit length
@@ -630,8 +629,13 @@ pub fn mutual_inductance_circular_to_linear_scalar(
             1.0, rznfil.0, rznfil.1, path_r_mid, path_z_mid,
         );
 
+    // Convert cylindrical vector potential to cartesian
+    let a_x_per_A = -a_phi_per_A * path_phi_mid.sin();
+    let a_y_per_A = a_phi_per_A * path_phi_mid.cos();
+    let a_z_per_A = 0.0;
+
     // Recover mutual inductance as dot(A, dL)/I
-    let m = a_phi_per_A * path_dlphi; // [H]
+    let m = dot3(a_x_per_A, a_y_per_A, a_z_per_A, dlxfil, dlyfil, dlzfil);
     m
 }
 
@@ -801,19 +805,21 @@ mod test {
         // Get mutual inductance by purpose-made calc
         // [H]
         let mutual_inductance =
+            mutual_inductance_circular_to_linear((&rfil, &zfil, &nfil), (&x, &y, &z)).unwrap();
+        let mutual_inductance_par =
             mutual_inductance_circular_to_linear_par((&rfil, &zfil, &nfil), (&x, &y, &z)).unwrap();
 
         // Get mutual inductance by brute-force calc
         let mut mutual_inductance_2 = 0.0;
         for i in 0..rfil.len() {
-            let ndiscr = 1000;
+            let ndiscr = 100;
             let (xfil, yfil, zfil) = discretize_circular_filament(rfil[i], zfil[i], ndiscr);
             let dlxfil0 = diff(&xfil);
             let dlyfil0 = diff(&yfil);
             let dlzfil0 = diff(&zfil);
             let dlxyzfil0 = (&dlxfil0[..], &dlyfil0[..], &dlzfil0[..]);
-            mutual_inductance_2 +=
-                crate::physics::linear_filament::inductance_piecewise_linear_filaments(
+            mutual_inductance_2 += nfil[i]
+                * crate::physics::linear_filament::inductance_piecewise_linear_filaments(
                     (
                         &xfil[0..ndiscr - 1],
                         &yfil[0..ndiscr - 1],
@@ -823,11 +829,16 @@ mod test {
                     (&x[0..n - 1], &y[0..n - 1], &z[0..n - 1]),
                     dlxyzfil1,
                     false,
-                ).unwrap();
+                )
+                .unwrap();
         }
 
-        println!("{mutual_inductance} {mutual_inductance_2}");
-        assert!(approx(mutual_inductance_2, mutual_inductance, 1e-6, 1e-12));
+        // Parallel and serial should match exactly, although changing the sum order
+        // produce slight differences due to float roundoff
+        assert!(approx(mutual_inductance, mutual_inductance_par, 1e-10, 1e-12));
+        // The brute force discretization calc takes an excessive
+        // amount of discretization to reach accuracy <1e-3
+        assert!(approx(mutual_inductance_2, mutual_inductance, 1e-2, 1e-12));
     }
 
     /// Check that B = curl(A)
