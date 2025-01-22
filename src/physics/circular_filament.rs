@@ -611,9 +611,11 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     //    r = (x^2 + y^2)^0.5 in cylindrical
     let path_r = rss3(xyzfil0.0, xyzfil0.1, 0.0); // [m]
     let path_dr = rss3(dlxfil, dlyfil, 0.0); // [m]
-                                             //    phi = tan^-1(y/x)
+
+    //    phi = tan^-1(y/x)
     let path_dphi = f64::atan2(dlyfil, dlxfil); // [rad]
-                                                //    midpoint is best for capturing curvature in piecewise-linear paths properly
+
+    //    midpoint is best for capturing curvature in piecewise-linear paths properly
     let path_r_mid = path_r + path_dr / 2.0; // [m]
     let path_z_mid = xyzfil0.2 + dlzfil / 2.0; // [m]
     let path_dlphi = path_r_mid * path_dphi; // [m] length in phi-direction; 2*pi cancels out
@@ -676,6 +678,39 @@ pub fn mutual_inductance_circular_to_linear(
             );
         }
     }
+
+    Ok(mutual_inductance)
+}
+
+pub fn mutual_inductance_circular_to_linear_par(
+    rznfil: (&[f64], &[f64], &[f64]),
+    xyzfil: (&[f64], &[f64], &[f64]),
+) -> Result<f64, &'static str> {
+    // Unpack
+    let (rfil, zfil, nfil) = rznfil;
+
+    // Chunk inputs
+    let ncores = std::thread::available_parallelism()
+        .unwrap_or(NonZeroUsize::MIN)
+        .get();
+
+    let n = (rfil.len() / ncores).max(1);
+
+    let rfilc = rfil.par_chunks(n);
+    let zfilc = zfil.par_chunks(n);
+    let nfilc = nfil.par_chunks(n);
+
+    // Run calcs
+    let mutual_inductance = nfilc
+        .zip(rfilc.zip(zfilc))
+        .try_fold(
+            || 0.0,
+            |acc, (nc, (rc, zc))| {
+                let m_contrib = mutual_inductance_circular_to_linear((rc, zc, nc), xyzfil)?;
+                Ok::<f64, &'static str>(acc + m_contrib)
+            },
+        )
+        .try_reduce(|| 0.0, |acc, v| Ok(acc + v))?;
 
     Ok(mutual_inductance)
 }
