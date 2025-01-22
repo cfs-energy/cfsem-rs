@@ -6,7 +6,7 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{ellipe, ellipk};
+use crate::math::{ellipe, ellipk, rss3};
 
 use crate::{MU0_OVER_4PI, MU_0};
 
@@ -147,9 +147,9 @@ pub fn flux_circular_filament(
 /// * `zfil`:    (m) z-coord of filament
 /// * `rprime`:  (m) r-coord of observation point
 /// * `zprime`:  (m) z-coord of observation point
-/// 
+///
 /// # Returns
-/// 
+///
 /// * `psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation location
 ///
 /// # Commentary
@@ -582,6 +582,49 @@ pub fn vector_potential_circular_filament_scalar(
 
     let a_phi = c0 * c1; // [V-s/m] phi-component of vector potential
     a_phi // Other components are zero
+}
+
+/// Mutual inductance between a circular filament and a linear filament.
+/// This method is much faster (~100x typically) than discretizing the circular loop
+/// into linear segments and using Neumann's formula.
+///
+/// # Arguments
+///
+/// * `rfil`:     (m) r-coord of circular filament
+/// * `zfil`:     (m) z-coord of circular filament
+/// * `xyzfil`:   (m) (x, y, z) coordinates of start of linear segment
+/// * `dlxyzfil`: (m) (dx, dy, dz) linear segment direction & length vector
+///
+/// # Returns
+///
+/// * `m`: (H), mutual inductance
+#[inline]
+pub fn mutual_inductance_circular_to_linear_scalar(
+    rfil: f64,
+    zfil: f64,
+    xyzfil: (f64, f64, f64),
+    dlxyzfil: (f64, f64, f64),
+) -> f64 {
+    // First, we need to map the linear filament into cylindrical coordinates
+    //    r = (x^2 + y^2)^0.5 in cylindrical
+    let path_r = rss3(xyzfil.0, xyzfil.1, 0.0);
+    let path_dr = rss3(dlxyzfil.0, dlxyzfil.1, 0.0);
+    //    phi = tan^-1(y/x)
+    let path_dphi = f64::atan2(dlxyzfil.1, dlxyzfil.0);
+    //    midpoint is best for capturing curvature in piecewise-linear paths properly
+    let path_r_mid = path_r + path_dr / 2.0;
+    let path_z_mid = xyzfil.2 + dlxyzfil.2 / 2.0;
+    let path_dlphi = path_r_mid * path_dphi; // [m] length in phi-direction; 2*pi cancels out
+
+    // Get cylindrical vector potential at linear segment midpoint
+    // for a unit current, which is equivalent to mutual inductance per unit length
+    // [H/m]
+    let a_phi_per_A =
+        vector_potential_circular_filament_scalar(1.0, rfil, zfil, path_r_mid, path_z_mid);
+
+    // Recover mutual inductance as dot(A, dL)/I
+    let m = a_phi_per_A * path_dlphi; // [H]
+    m
 }
 
 #[cfg(test)]
