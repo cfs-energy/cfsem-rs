@@ -127,23 +127,67 @@ pub fn flux_circular_filament(
 
     for i in 0..n {
         for j in 0..m {
-            let rrprime = rfil[j] * rprime[i];
-            let r_plus_rprime = rfil[j] + rprime[i];
-            let z_minus_zprime = zfil[j] - zprime[i];
-            let k2 = 4.0 * rrprime / (r_plus_rprime.powi(2) + z_minus_zprime.powi(2));
-
-            // The contributions added here have units of ampere meter,
-            // but the sum will have units of weber after it is multiplied by mu_0 below.
+            // The inner function is inlined, so values that are reused between iterations
+            // are pulled to the outer scope by the compiler and do not affect performance
             out_psi[i] +=
-                ifil[j] * (rrprime / k2).sqrt() * ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2));
+                flux_circular_filament_scalar(ifil[j], rfil[j], zfil[j], rprime[i], zprime[i]);
         }
     }
 
-    for i in 0..n {
-        out_psi[i] *= MU_0;
-    }
-
     Ok(())
+}
+
+/// Flux contributions from some circular filaments to some observation points, which happens to be
+/// the Green's function for the Grad-Shafranov elliptic operator, $\Delta^{\*}$.
+///
+/// # Arguments
+///
+/// * `ifil`: (A) current in filament
+/// * `rfil`:    (m) r-coord of filament
+/// * `zfil`:    (m) z-coord of filament
+/// * `rprime`:  (m) r-coord of observation point
+/// * `zprime`:  (m) z-coord of observation point
+/// 
+/// # Returns
+/// 
+/// * `psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation location
+///
+/// # Commentary
+///
+/// Represents contribution from a current at (R, Z) to an observation point at (Rprime, Zprime)
+///
+/// Note Jardin's 4.61-4.66 presents it with a different definition of
+/// the elliptic integrals from what is used here and in scipy.
+///
+/// # References
+///
+///   \[1\] D. Kaltsas, A. Kuiroukidis, and G. Throumoulopoulos, “A tokamak pertinent analytic equilibrium with plasma flow of arbitrary direction,”
+///         Physics of Plasmas, vol. 26, p. 124501, Dec. 2019,
+///         doi: [10.1063/1.5120341](https://doi.org/10.1063/1.5120341).
+///
+///   \[2\] S. Jardin, *Computational Methods in Plasma Physics*, 1st ed. USA: CRC Press, Inc., 2010.
+///
+///   \[3\] J. Huang and J. Menard, “Development of an Auto-Convergent Free-Boundary Axisymmetric Equilibrium Solver,”
+///         Journal of Undergraduate Research, vol. 6, Jan. 2006, Accessed: May 05, 2021. \[Online\].
+///         Available: <https://www.osti.gov/biblio/1051805-development-auto-convergent-free-boundary-axisymmetric-equilibrium-solver>
+///
+///   \[4\] J. C. Simpson, J. E. Lane, C. D. Immer, R. C. Youngquist, and T. Steinrock,
+///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
+///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
+#[inline]
+pub fn flux_circular_filament_scalar(
+    ifil: f64,
+    rfil: f64,
+    zfil: f64,
+    rprime: f64,
+    zprime: f64,
+) -> f64 {
+    let rrprime = rfil * rprime;
+    let r_plus_rprime = rfil + rprime;
+    let z_minus_zprime = zfil - zprime;
+    let k2 = 4.0 * rrprime / (r_plus_rprime.powi(2) + z_minus_zprime.powi(2));
+    let psi = MU_0 * ifil * (rrprime / k2).sqrt() * ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2)); // [V-s]
+    psi
 }
 
 /// Off-axis Br,Bz components for a circular current filament in vacuum.
@@ -288,43 +332,95 @@ pub fn flux_density_circular_filament(
     // iterate over filaments first here.
     for i in 0..n {
         for j in 0..m {
-            let z = zprime[j] - zfil[i]; // [m]
-
-            let z2 = z * z; // [m^2]
-            let r2 = rprime[j] * rprime[j]; // [m^2]
-
-            let rpr = rfil[i] + rprime[j];
-
-            let q = rpr.mul_add(rpr, z2); // [m^2]
-            let k2 = 4.0 * rfil[i] * rprime[j] / q; // [nondim]
-
-            let a0 = 2.0 * ifil[i] / q.sqrt(); // [A/m]
-
-            let f = ellipk(k2); // [nondim]
-            let s = ellipe(k2) / (1.0 - k2); // [nondim]
-
-            // Bake some reusable values
-            let s_over_q = s / q; // [m^-2]
-            let rfil2 = rfil[i] * rfil[i]; // [m^2]
-
-            // Magnetic field intensity, less the factor of 4pi that we have adjusted out of mu_0
-            let hr = (z / rprime[j]) * a0 * s_over_q.mul_add(rfil2 + r2 + z2, -f);
-            let hz = a0 * s_over_q.mul_add(rfil2 - r2 - z2, f);
-
-            // Magnetic flux density assuming vacuum permeability
-            // The contributions added here have units of ampere per meter,
-            // but the result will have units of tesla after it is multiplied by mu_0 / (4 * pi) below.
-            out_r[j] += hr;
-            out_z[j] += hz;
+            // The inner function is inlined, so values that are reused between iterations
+            // are pulled to the outer scope by the compiler and do not affect performance
+            let (br, bz) = flux_density_circular_filament_scalar(
+                ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
+            );
+            out_r[j] += br;
+            out_z[j] += bz;
         }
     }
 
-    for j in 0..m {
-        out_r[j] *= MU0_OVER_4PI;
-        out_z[j] *= MU0_OVER_4PI;
-    }
-
     Ok(())
+}
+
+/// Off-axis Br,Bz components for a circular current filament in vacuum.
+///
+/// # Arguments
+///
+/// * `ifil`:    (A) current in filament
+/// * `rfil`:    (m) r-coord of filament
+/// * `zfil`:    (m) z-coord of filament
+/// * `rprime`:  (m) r-coord of observation point
+/// * `zprime`:  (m) z-coord of observation point
+///
+/// # Returns
+///
+/// * `br`:   (T), r-component of magnetic flux density at observation location
+/// * `bz`:   (T), z-component of magnetic flux density at observation location
+///
+/// # Commentary
+///
+/// Near-exact formula (except numerically-evaluated elliptic integrals).
+/// See eqns. 12,13 pg. 34 in \[1\], eqn 9.8.7 in \[2\], and all of \[3\].
+///
+/// Note the formula for Br as given by \[1\] is incorrect and does not satisfy the
+/// constraints of the calculation without correcting by a factor of (z / r).
+///
+/// # References
+///
+///   \[1\] D. B. Montgomery and J. Terrell,
+///         “Some Useful Information For The Design Of Aircore Solenoids,
+///         Part I. Relationships Between Magnetic Field, Power, Ampere-Turns
+///         And Current Density. Part II. Homogeneous Magnetic Fields,”
+///         Massachusetts Inst. Of Tech. Francis Bitter National Magnet Lab, Cambridge, MA,
+///         Nov. 1961. Accessed: May 18, 2021. \[Online\].
+///         Available: <https://apps.dtic.mil/sti/citations/tr/AD0269073>
+///
+///   \[2\] 8.02 Course Notes. Available: <https://web.mit.edu/8.02t/www/802TEAL3D/visualizations/coursenotes/modules/guide09.pdf>
+///
+///   \[3\] Eric Dennyson, "Magnet Formulas". Available: <https://tiggerntatie.github.io/emagnet-py/offaxis/off_axis_loop.html>
+///
+///   \[4\] J. C. Simpson, J. E. Lane, C. D. Immer, R. C. Youngquist, and T. Steinrock,
+///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
+///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
+#[inline]
+pub fn flux_density_circular_filament_scalar(
+    ifil: f64,
+    rfil: f64,
+    zfil: f64,
+    rprime: f64,
+    zprime: f64,
+) -> (f64, f64) {
+    let z = zprime - zfil; // [m]
+
+    let z2 = z * z; // [m^2]
+    let r2 = rprime * rprime; // [m^2]
+
+    let rpr = rfil + rprime;
+
+    let q = rpr.mul_add(rpr, z2); // [m^2]
+    let k2 = 4.0 * rfil * rprime / q; // [nondim]
+
+    let a0 = 2.0 * ifil / q.sqrt(); // [A/m]
+
+    let f = ellipk(k2); // [nondim]
+    let s = ellipe(k2) / (1.0 - k2); // [nondim]
+
+    // Bake some reusable values
+    let s_over_q = s / q; // [m^-2]
+    let rfil2 = rfil * rfil; // [m^2]
+
+    // Magnetic field intensity, less the factor of 4pi that we have adjusted out of mu_0
+    let hr = (z / rprime) * a0 * s_over_q.mul_add(rfil2 + r2 + z2, -f);
+    let hz = a0 * s_over_q.mul_add(rfil2 - r2 - z2, f);
+
+    // Magnetic flux density assuming vacuum permeability
+    let br = MU0_OVER_4PI * hr;
+    let bz = MU0_OVER_4PI * hz;
+
+    (br, bz)
 }
 
 /// Off-axis A_phi component for a circular current filament in vacuum.
@@ -423,33 +519,69 @@ pub fn vector_potential_circular_filament(
 
     for i in 0..n {
         for j in 0..m {
-            // Eq. 1 and 2 of Simpson2001 give a formula for the vector potential of a loop in spherical coordinates.
-            // Here, we use that formula adjusted to cylindrical coordinates.
-            // r_spherical*sin(theta) = r_cylindrical
-            // r_spherical^2 = r_cylindrical^2 + z^2
-            let z = zprime[j] - zfil[i]; // [m]
-
-            // Assemble argument to elliptic integrals
-            let rpr = rfil[i] + rprime[j];
-            let denom = z.mul_add(z, rpr * rpr);
-            let numer = 4.0 * rfil[i] * rprime[j];
-            let k2 = numer / denom;
-
-            // Elliptic integral terms
-            let c0 = ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2)) / k2;
-
-            // Factor multiplied into elliptic integral terms
-            let c1 = ifil[i] * 4.0 * rfil[i] / denom.sqrt();
-
-            out_phi[j] = c0.mul_add(c1, out_phi[j]);
+            // The inner function is inlined, so values that are reused between iterations
+            // are pulled to the outer scope by the compiler and do not affect performance
+            out_phi[j] += vector_potential_circular_filament_scalar(
+                ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
+            );
         }
     }
 
-    for j in 0..m {
-        out_phi[j] *= MU0_OVER_4PI;
-    }
-
     Ok(())
+}
+
+/// Off-axis A_phi component for a circular current filament in vacuum.
+///
+/// # Arguments
+///
+/// * `ifil`:    (A) current in filament
+/// * `rfil`:    (m) r-coord of filament
+/// * `zfil`:    (m) z-coord of filament
+/// * `rprime`:  (m) r-coord of observation point
+/// * `zprime`:  (m) z-coord of observation point
+///
+/// # Returns
+/// * `a_phi`: (V-s/m), phi-component of magnetic vector potential at observation location
+///
+/// # Commentary
+///
+/// Near-exact formula (except numerically-evaluated elliptic integrals).
+/// The vector potential of a loop has zero r- and z- components due to symmetry,
+/// and does not vary in the phi-direction.
+///
+/// # References
+///
+///   \[1\] J. C. Simpson, J. E. Lane, C. D. Immer, R. C. Youngquist, and T. Steinrock,
+///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
+///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
+#[inline]
+pub fn vector_potential_circular_filament_scalar(
+    ifil: f64,
+    rfil: f64,
+    zfil: f64,
+    rprime: f64,
+    zprime: f64,
+) -> f64 {
+    // Eq. 1 and 2 of Simpson2001 give a formula for the vector potential of a loop in spherical coordinates.
+    // Here, we use that formula adjusted to cylindrical coordinates.
+    // r_spherical*sin(theta) = r_cylindrical
+    // r_spherical^2 = r_cylindrical^2 + z^2
+    let z = zprime - zfil; // [m]
+
+    // Assemble argument to elliptic integrals
+    let rpr2 = (rfil + rprime).powf(2.0);
+    let denom = z.mul_add(z, rpr2);
+    let numer = 4.0 * rfil * rprime;
+    let k2 = numer / denom;
+
+    // Elliptic integral terms
+    let c0 = ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2)) / k2;
+
+    // Factor multiplied into elliptic integral terms
+    let c1 = MU0_OVER_4PI * ifil * 4.0 * rfil / denom.sqrt();
+
+    let a_phi = c0 * c1; // [V-s/m] phi-component of vector potential
+    a_phi // Other components are zero
 }
 
 #[cfg(test)]

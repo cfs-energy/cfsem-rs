@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 2025-01-21
+
+### Added
+
+* Add scalar calculation of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
+
+# Changelog
+
 ## 1.1.0 2024-08-20
 
 ### Added

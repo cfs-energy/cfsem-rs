@@ -108,7 +108,7 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
             group.bench_with_input(
                 BenchmarkId::new(
                     format!(
-                        "Poloidal Flux of a Circular Filament\n{} Obs. Point(s)",
+                        "Vector Potential of a Circular Filament\n{} Obs. Point(s)",
                         nobs
                     ),
                     ntot,
@@ -129,7 +129,7 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
             group.bench_with_input(
                 BenchmarkId::new(
                     format!(
-                        "Poloidal Flux of a Circular Filament, Parallel\n{} Obs. Point(s)",
+                        "Vector Potential of a Circular Filament, Parallel\n{} Obs. Point(s)",
                         nobs
                     ),
                     ntot,
