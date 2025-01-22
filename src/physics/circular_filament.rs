@@ -837,7 +837,8 @@ mod test {
         // produce slight differences due to float roundoff
         assert!(approx(mutual_inductance, mutual_inductance_par, 1e-10, 1e-12));
         // The brute force discretization calc takes an excessive
-        // amount of discretization to reach accuracy <1e-3
+        // amount of discretization to reach accuracy <1e-3, but converges rapidly to
+        // about 1e-2 relative accuracy
         assert!(approx(mutual_inductance_2, mutual_inductance, 1e-2, 1e-12));
     }
 
