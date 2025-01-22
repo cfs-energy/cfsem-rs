@@ -613,7 +613,9 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     let path_dr = rss3(dlxfil, dlyfil, 0.0); // [m]
 
     //    phi = tan^-1(y/x)
-    let path_dphi = f64::atan2(dlyfil, dlxfil); // [rad]
+    let path_phi0 = f64::atan2(xyzfil0.1, xyzfil0.0);
+    let path_phi1 = f64::atan2(xyzfil1.1, xyzfil1.0);
+    let path_dphi = path_phi1 - path_phi0;
 
     //    midpoint is best for capturing curvature in piecewise-linear paths properly
     let path_r_mid = path_r + path_dr / 2.0; // [m]
@@ -701,6 +703,8 @@ pub fn mutual_inductance_circular_to_linear_par(
     let nfilc = nfil.par_chunks(n);
 
     // Run calcs
+    // We have to sum over contributions that are each individually fallible,
+    // which results in a bit of clutter with the fold-reduce pattern
     let mutual_inductance = nfilc
         .zip(rfilc.zip(zfilc))
         .try_fold(
@@ -717,7 +721,7 @@ pub fn mutual_inductance_circular_to_linear_par(
 
 #[cfg(test)]
 mod test {
-    use std::f64::consts::PI;
+    use core::f64::consts::{E, PI};
 
     use super::*;
 
@@ -726,6 +730,104 @@ mod test {
         let abs_err = (val - truth).abs();
         let lim = rtol * truth.abs() + atol;
         abs_err < lim
+    }
+
+    /// Make sure the circular-to-linear mutual inductance calc matches
+    /// the result achieved by discretizing the circular filament
+    /// into linear segments
+    #[test]
+    fn test_mutual_inductance_to_linear() {
+        let linspace = |start, end, n| {
+            (0..n)
+                .map(|i| start + (i as f64 / (n - 1) as f64) * (end - start))
+                .collect::<Vec<f64>>()
+        };
+
+        let diff = |v: &[f64]| {
+            v[1..]
+                .iter()
+                .zip(v[0..v.len() - 1].iter())
+                .map(|(&b, &a)| b - a)
+                .collect::<Vec<f64>>()
+        };
+
+        let discretize_circular_filament = |r: f64, z, ndiscr| {
+            let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+                .iter()
+                .map(|v| r * v.cos())
+                .collect();
+            let y: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+                .iter()
+                .map(|v| r * v.sin())
+                .collect();
+            let z: Vec<f64> = (0..ndiscr).map(|_| z).collect();
+            (x, y, z)
+        };
+
+        // Make some circular filaments
+        let r = 1.0 / PI; // [m] some number
+        let z = 1.0 / E; // [m] some number
+
+        let rfil = [r, r + E / 4.0];
+        let zfil = [z, -z];
+        let nfil = [PI, E];
+
+        // Make a slightly tilted helical piecewise-linear filament
+        let n = 10_000;
+        let xc = [0.1, -0.1]; // Start and end of centerline path
+        let yc = [-0.05, 0.2];
+        let zc = [-2.0 * z, 2.0 * z];
+
+        let xc: Vec<f64> = linspace(xc[0], xc[1], n);
+        let yc: Vec<f64> = linspace(yc[0], yc[1], n);
+        let zc: Vec<f64> = linspace(zc[0], zc[1], n);
+
+        let mut x = xc.clone();
+        let mut y = xc.clone();
+        let mut z = xc.clone();
+        crate::mesh::filament_helix_path(
+            (&xc, &yc, &zc),
+            (2.0 * E / 3.0, 0.0, 0.0),
+            0.5,
+            0.0,
+            (&mut x, &mut y, &mut z),
+        )
+        .unwrap();
+        let dlxfil1 = diff(&x);
+        let dlyfil1 = diff(&y);
+        let dlzfil1 = diff(&z);
+        let dlxyzfil1 = (&dlxfil1[..], &dlyfil1[..], &dlzfil1[..]);
+
+        // Get mutual inductance by purpose-made calc
+        // [H]
+        let mutual_inductance =
+            mutual_inductance_circular_to_linear_par((&rfil, &zfil, &nfil), (&x, &y, &z)).unwrap();
+
+        // Get mutual inductance by brute-force calc
+        let mut mutual_inductance_2 = 0.0;
+        for i in 0..rfil.len() {
+            let ndiscr = 1000;
+            let (xfil, yfil, zfil) = discretize_circular_filament(rfil[i], zfil[i], ndiscr);
+            let dlxfil0 = diff(&xfil);
+            let dlyfil0 = diff(&yfil);
+            let dlzfil0 = diff(&zfil);
+            let dlxyzfil0 = (&dlxfil0[..], &dlyfil0[..], &dlzfil0[..]);
+            mutual_inductance_2 +=
+                crate::physics::linear_filament::inductance_piecewise_linear_filaments(
+                    (
+                        &xfil[0..ndiscr - 1],
+                        &yfil[0..ndiscr - 1],
+                        &zfil[0..ndiscr - 1],
+                    ),
+                    dlxyzfil0,
+                    (&x[0..n - 1], &y[0..n - 1], &z[0..n - 1]),
+                    dlxyzfil1,
+                    false,
+                ).unwrap();
+        }
+
+        println!("{mutual_inductance} {mutual_inductance_2}");
+        assert!(approx(mutual_inductance_2, mutual_inductance, 1e-6, 1e-12));
     }
 
     /// Check that B = curl(A)
