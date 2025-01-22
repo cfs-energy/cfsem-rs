@@ -590,41 +590,94 @@ pub fn vector_potential_circular_filament_scalar(
 ///
 /// # Arguments
 ///
-/// * `rfil`:     (m) r-coord of circular filament
-/// * `zfil`:     (m) z-coord of circular filament
-/// * `xyzfil`:   (m) (x, y, z) coordinates of start of linear segment
-/// * `dlxyzfil`: (m) (dx, dy, dz) linear segment direction & length vector
+/// * `rznfil`:    (m, m, nondim) r,z-coord and number of turns of circular filament
+/// * `xyzfil0`:   (m) (x, y, z) coordinates of start of linear segment
+/// * `xyzfil1`:   (m) (x, y, z) coordinates of end of linear segment
 ///
 /// # Returns
 ///
 /// * `m`: (H), mutual inductance
 #[inline]
 pub fn mutual_inductance_circular_to_linear_scalar(
-    rfil: f64,
-    zfil: f64,
-    xyzfil: (f64, f64, f64),
-    dlxyzfil: (f64, f64, f64),
+    rznfil: (f64, f64, f64),
+    xyzfil0: (f64, f64, f64),
+    xyzfil1: (f64, f64, f64),
 ) -> f64 {
-    // First, we need to map the linear filament into cylindrical coordinates
+    // First, get the filament vector
+    let dlxfil = xyzfil1.0 - xyzfil0.0; // [m]
+    let dlyfil = xyzfil1.1 - xyzfil0.1;
+    let dlzfil = xyzfil1.2 - xyzfil0.2;
+    // Next, we need to map the linear filament into cylindrical coordinates
     //    r = (x^2 + y^2)^0.5 in cylindrical
-    let path_r = rss3(xyzfil.0, xyzfil.1, 0.0);
-    let path_dr = rss3(dlxyzfil.0, dlxyzfil.1, 0.0);
-    //    phi = tan^-1(y/x)
-    let path_dphi = f64::atan2(dlxyzfil.1, dlxyzfil.0);
-    //    midpoint is best for capturing curvature in piecewise-linear paths properly
-    let path_r_mid = path_r + path_dr / 2.0;
-    let path_z_mid = xyzfil.2 + dlxyzfil.2 / 2.0;
+    let path_r = rss3(xyzfil0.0, xyzfil0.1, 0.0); // [m]
+    let path_dr = rss3(dlxfil, dlyfil, 0.0); // [m]
+                                             //    phi = tan^-1(y/x)
+    let path_dphi = f64::atan2(dlyfil, dlxfil); // [rad]
+                                                //    midpoint is best for capturing curvature in piecewise-linear paths properly
+    let path_r_mid = path_r + path_dr / 2.0; // [m]
+    let path_z_mid = xyzfil0.2 + dlzfil / 2.0; // [m]
     let path_dlphi = path_r_mid * path_dphi; // [m] length in phi-direction; 2*pi cancels out
 
     // Get cylindrical vector potential at linear segment midpoint
     // for a unit current, which is equivalent to mutual inductance per unit length
     // [H/m]
-    let a_phi_per_A =
-        vector_potential_circular_filament_scalar(1.0, rfil, zfil, path_r_mid, path_z_mid);
+    let a_phi_per_A = rznfil.2
+        * vector_potential_circular_filament_scalar(
+            1.0, rznfil.0, rznfil.1, path_r_mid, path_z_mid,
+        );
 
     // Recover mutual inductance as dot(A, dL)/I
     let m = a_phi_per_A * path_dlphi; // [H]
     m
+}
+
+/// Mutual inductance between a collection of circular filaments and a piecewise-linear filament.
+/// This method is much faster (~100x typically) than discretizing the circular loop
+/// into linear segments and using Neumann's formula.
+///
+/// # Arguments
+///
+/// * `rznfil`:  (m, m, nondim) r,z-coord and number of turns of each circular filament, length `m`
+/// * `xyzfil`:  (m) filament origin coordinates for linear path, length `n`, including endpoint
+///
+/// # Returns
+///
+/// * `m`: (V-s/m), phi-component of magnetic vector potential at observation locations
+pub fn mutual_inductance_circular_to_linear(
+    rznfil: (&[f64], &[f64], &[f64]),
+    xyzfil: (&[f64], &[f64], &[f64]),
+) -> Result<f64, &'static str> {
+    // Check lengths; Error if they do not match
+    let n = xyzfil.0.len();
+    if xyzfil.0.len() != n || xyzfil.1.len() != n || xyzfil.2.len() != n || n < 2
+    // Need at least 2 points to form a piecewise linear path
+    {
+        return Err("Input length mismatch");
+    }
+
+    // Check lengths; Error if they do not match
+    let m = rznfil.0.len();
+    if rznfil.0.len() != m || rznfil.1.len() != m || rznfil.2.len() != m {
+        return Err("Length mismatch");
+    }
+
+    let mut mutual_inductance = 0.0;
+
+    for i in 0..n - 1 {
+        for j in 0..m {
+            // The inner function is inlined, so values that are reused between iterations
+            // are pulled to the outer scope by the compiler and do not affect performance
+            let xyzfil0 = (xyzfil.0[i], xyzfil.1[i], xyzfil.2[i]);
+            let xyzfil1 = (xyzfil.0[i + 1], xyzfil.1[i + 1], xyzfil.2[i + 1]);
+            mutual_inductance += mutual_inductance_circular_to_linear_scalar(
+                (rznfil.0[j], rznfil.1[j], rznfil.2[j]),
+                xyzfil0,
+                xyzfil1,
+            );
+        }
+    }
+
+    Ok(mutual_inductance)
 }
 
 #[cfg(test)]
