@@ -14,6 +14,9 @@
 * Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
 
+### Changed
+
+* Use `Slice::fill(0.0)` instead of manually zeroing output arrays
 
 # Changelog
 
