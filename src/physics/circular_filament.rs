@@ -16,12 +16,9 @@ use crate::{MU0_OVER_4PI, MU_0};
 ///
 /// # Arguments
 ///
-/// * `ifil`: (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
+/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
 /// # Commentary
 ///
@@ -46,13 +43,13 @@ use crate::{MU0_OVER_4PI, MU_0};
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_circular_filament_par(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_psi: &mut [f64],
+    irzfil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: &mut [f64],
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (rprime, zprime) = rzobs;
+
     // Chunk inputs
     let ncores = std::thread::available_parallelism()
         .unwrap_or(NonZeroUsize::MIN)
@@ -63,11 +60,11 @@ pub fn flux_circular_filament_par(
     let rprimec = rprime.par_chunks(n);
     let zprimec = zprime.par_chunks(n);
 
-    let outc = out_psi.par_chunks_mut(n);
+    let outc = out.par_chunks_mut(n);
 
     // Run calcs
     outc.zip(rprimec.zip(zprimec))
-        .try_for_each(|(outc, (rc, zc))| flux_circular_filament(ifil, rfil, zfil, rc, zc, outc))?;
+        .try_for_each(|(outc, (rc, zc))| flux_circular_filament(irzfil, (rc, zc), outc))?;
 
     Ok(())
 }
@@ -77,12 +74,9 @@ pub fn flux_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `ifil`: (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_psi`: (Wb) or (H-A) or (T-m^2) or (V-s), poloidal flux at observation locations, length `n`
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
+/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
 /// # Commentary
 ///
@@ -107,29 +101,30 @@ pub fn flux_circular_filament_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_circular_filament(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_psi: &mut [f64],
+    irzfil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: &mut [f64],
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (rprime, zprime) = rzobs;
+
     // Check lengths; Error if they do not match
     let m: usize = ifil.len();
     let n: usize = rprime.len();
-    if rfil.len() != m || zfil.len() != m || zprime.len() != n || out_psi.len() != n {
+    if rfil.len() != m || zfil.len() != m || zprime.len() != n || out.len() != n {
         return Err("Length mismatch");
     }
 
     // Zero output
-    out_psi.fill(0.0);
+    out.fill(0.0);
 
     for i in 0..n {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
-            out_psi[i] +=
-                flux_circular_filament_scalar(ifil[j], rfil[j], zfil[j], rprime[i], zprime[i]);
+            out[i] +=
+                flux_circular_filament_scalar((ifil[j], rfil[j], zfil[j]), (rprime[i], zprime[i]));
         }
     }
 
@@ -141,11 +136,9 @@ pub fn flux_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `ifil`: (A) current in filament
-/// * `rfil`:    (m) r-coord of filament
-/// * `zfil`:    (m) z-coord of filament
-/// * `rprime`:  (m) r-coord of observation point
-/// * `zprime`:  (m) z-coord of observation point
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
+/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
 /// # Returns
 ///
@@ -174,13 +167,11 @@ pub fn flux_circular_filament(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 #[inline]
-pub fn flux_circular_filament_scalar(
-    ifil: f64,
-    rfil: f64,
-    zfil: f64,
-    rprime: f64,
-    zprime: f64,
-) -> f64 {
+pub fn flux_circular_filament_scalar(irzfil: (f64, f64, f64), rzobs: (f64, f64)) -> f64 {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (rprime, zprime) = rzobs;
+    // Evaluate
     let rrprime = rfil * rprime;
     let r_plus_rprime = rfil + rprime;
     let z_minus_zprime = zfil - zprime;
@@ -1120,7 +1111,8 @@ mod test {
                 // psi = integral(dot(A, dL)) =  2pi * r * a
                 let psi_from_a = 2.0 * PI * *r * vp(*r, *z);
                 let mut psi = [0.0];
-                flux_circular_filament(&[1.0], &[rfil], &[zfil], &[*r], &[*z], &mut psi).unwrap();
+                flux_circular_filament((&[1.0], &[rfil], &[zfil]), (&[*r], &[*z]), &mut psi)
+                    .unwrap();
                 println!("{psi:?}, {psi_from_a}");
                 assert!(approx(psi_from_a, psi[0], 1e-10, 0.0)); // Should be very close to float roundoff
             }
@@ -1153,8 +1145,8 @@ mod test {
         let out3 = &mut [3.0; NOBS];
 
         // Flux
-        flux_circular_filament(&ifil, &rfil, &zfil, &rprime, &zprime, out0).unwrap();
-        flux_circular_filament_par(&ifil, &rfil, &zfil, &rprime, &zprime, out1).unwrap();
+        flux_circular_filament((&ifil, &rfil, &zfil), (&rprime, &zprime), out0).unwrap();
+        flux_circular_filament_par((&ifil, &rfil, &zfil), (&rprime, &zprime), out1).unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out1[i]);
         }

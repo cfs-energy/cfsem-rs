@@ -47,8 +47,12 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(
-                            flux_circular_filament(&current, &rfil, &zfil, &robs, &zobs, &mut out)
-                                .unwrap(),
+                            flux_circular_filament(
+                                (&current, &rfil, &zfil),
+                                (&robs, &zobs),
+                                &mut out,
+                            )
+                            .unwrap(),
                         )
                     });
                 },
@@ -67,7 +71,9 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             flux_circular_filament_par(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&current, &rfil, &zfil),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
