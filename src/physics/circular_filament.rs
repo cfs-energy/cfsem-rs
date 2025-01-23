@@ -121,9 +121,8 @@ pub fn flux_circular_filament(
         return Err("Length mismatch");
     }
 
-    for i in 0..n {
-        out_psi[i] = 0.0;
-    }
+    // Zero output
+    out_psi.fill(0.0);
 
     for i in 0..n {
         for j in 0..m {
@@ -319,10 +318,9 @@ pub fn flux_density_circular_filament(
         return Err("Length mismatch");
     }
 
-    for j in 0..m {
-        out_r[j] = 0.0;
-        out_z[j] = 0.0;
-    }
+    // Zero output
+    out_r.fill(0.0);
+    out_z.fill(0.0);
 
     // There aren't necessarily more observation points or filaments, depending on the use case.
     // The more common extreme is to see a very large number of filaments evaluated at a smaller
@@ -626,9 +624,8 @@ pub fn vector_potential_circular_filament(
         return Err("Length mismatch");
     }
 
-    for j in 0..m {
-        out_phi[j] = 0.0;
-    }
+    // Zero output
+    out_phi.fill(0.0);
 
     for i in 0..n {
         for j in 0..m {
