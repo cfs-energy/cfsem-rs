@@ -194,13 +194,9 @@ pub fn flux_circular_filament_scalar(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_r`:   (T), r-component of magnetic flux density at observation locations, length `n`
-/// * `out_z`:   (T), z-component of magnetic flux density at observation locations, length `n`
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
+/// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
 /// # Commentary
 ///
@@ -228,14 +224,14 @@ pub fn flux_circular_filament_scalar(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_density_circular_filament_par(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_r: &mut [f64],
-    out_z: &mut [f64],
+    irzfil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: (&mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (rprime, zprime) = rzobs;
+    let (out_r, out_z) = out;
+
     // Chunk inputs
     let ncores = std::thread::available_parallelism()
         .unwrap_or(NonZeroUsize::MIN)
@@ -253,7 +249,7 @@ pub fn flux_density_circular_filament_par(
     outrc
         .zip(outzc.zip(rprimec.zip(zprimec)))
         .try_for_each(|(orc, (ozc, (rc, zc)))| {
-            flux_density_circular_filament(ifil, rfil, zfil, rc, zc, orc, ozc)
+            flux_density_circular_filament(irzfil, (rc, zc), (orc, ozc))
         })?;
 
     Ok(())
@@ -263,13 +259,9 @@ pub fn flux_density_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_r`:   (T), r-component of magnetic flux density at observation locations, length `n`
-/// * `out_z`:   (T), z-component of magnetic flux density at observation locations, length `n`
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
+/// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
 /// # Commentary
 ///
@@ -297,14 +289,16 @@ pub fn flux_density_circular_filament_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_density_circular_filament(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_r: &mut [f64],
-    out_z: &mut [f64],
+    irzfil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: (&mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (rprime, zprime) = rzobs;
+    let (out_r, out_z) = out;
+
+    // Check lengths
     let n = ifil.len();
     let m = rprime.len();
 
@@ -1114,13 +1108,9 @@ mod test {
                 let mut br = [0.0];
                 let mut bz = [0.0];
                 flux_density_circular_filament(
-                    &[1.0],
-                    &[rfil],
-                    &[zfil],
-                    &[*r],
-                    &[*z],
-                    &mut br,
-                    &mut bz,
+                    (&[1.0], &[rfil], &[zfil]),
+                    (&[*r], &[*z]),
+                    (&mut br, &mut bz),
                 )
                 .unwrap();
 
@@ -1171,8 +1161,9 @@ mod test {
         }
 
         // Flux density
-        flux_density_circular_filament(&ifil, &rfil, &zfil, &rprime, &zprime, out0, out1).unwrap();
-        flux_density_circular_filament_par(&ifil, &rfil, &zfil, &rprime, &zprime, out2, out3)
+        flux_density_circular_filament((&ifil, &rfil, &zfil), (&rprime, &zprime), (out0, out1))
+            .unwrap();
+        flux_density_circular_filament_par((&ifil, &rfil, &zfil), (&rprime, &zprime), (out2, out3))
             .unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out2[i]);

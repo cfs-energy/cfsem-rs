@@ -190,7 +190,9 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament(
-                            &current, &rfil, &zfil, &robs, &zobs, &mut out, &mut out1,
+                            (&current, &rfil, &zfil),
+                            (&robs, &zobs),
+                            (&mut out, &mut out1),
                         ))
                     });
                 },
@@ -208,7 +210,9 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament_par(
-                            &current, &rfil, &zfil, &robs, &zobs, &mut out, &mut out1,
+                            (&current, &rfil, &zfil),
+                            (&robs, &zobs),
+                            (&mut out, &mut out1),
                         ))
                     });
                 },
