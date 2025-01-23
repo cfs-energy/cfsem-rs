@@ -327,7 +327,8 @@ pub fn flux_density_circular_filament(
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
             let (br, bz) = flux_density_circular_filament_scalar(
-                ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
+                (ifil[i], rfil[i], zfil[i]),
+                (rprime[j], zprime[j]),
             );
             out_r[j] += br;
             out_z[j] += bz;
@@ -341,16 +342,12 @@ pub fn flux_density_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in filament
-/// * `rfil`:    (m) r-coord of filament
-/// * `zfil`:    (m) z-coord of filament
-/// * `rprime`:  (m) r-coord of observation point
-/// * `zprime`:  (m) z-coord of observation point
+/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 ///
 /// # Returns
 ///
-/// * `br`:   (T), r-component of magnetic flux density at observation location
-/// * `bz`:   (T), z-component of magnetic flux density at observation location
+/// * `(br, bz)`:   (T, T), r- and z-component of magnetic flux density at observation location
 ///
 /// # Commentary
 ///
@@ -379,12 +376,14 @@ pub fn flux_density_circular_filament(
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 #[inline]
 pub fn flux_density_circular_filament_scalar(
-    ifil: f64,
-    rfil: f64,
-    zfil: f64,
-    rprime: f64,
-    zprime: f64,
+    irzfil: (f64, f64, f64),
+    rzobs: (f64, f64),
 ) -> (f64, f64) {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (rprime, zprime) = rzobs;
+
+    // Evaluate
     let z = zprime - zfil; // [m]
 
     let z2 = z * z; // [m^2]
@@ -430,7 +429,7 @@ pub fn flux_density_circular_filament_cartesian_scalar(
     // Convert cartesian point to cylindrical
     let (robs, phiobs, zobs) = crate::math::cartesian_to_cylindrical(x, y, z);
     // Get axisymmetric B-field
-    let (br, bz) = flux_density_circular_filament_scalar(ifil, rfil, zfil, robs, zobs);
+    let (br, bz) = flux_density_circular_filament_scalar((ifil, rfil, zfil), (robs, zobs));
     // Convert axisymmetric B-field to cartesian
     let (bx, by, bz) = (br * libm::cos(phiobs), br * libm::sin(phiobs), bz);
     (bx, by, bz)

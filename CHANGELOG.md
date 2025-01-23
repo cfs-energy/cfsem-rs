@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0 2025-01-21
+## 2.0.0 2025-01-21
 
 ### Added
 
@@ -17,6 +17,7 @@
 ### Changed
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
+* !Consolidate function signature of `flux_density_circular_filament[_par]`
 
 # Changelog
 
