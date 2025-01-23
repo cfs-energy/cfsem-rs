@@ -851,51 +851,48 @@ mod test {
         abs_err < lim
     }
 
-    /// Make sure the circular-to-linear mutual inductance calc matches
-    /// the result achieved by discretizing the circular filament
-    /// into linear segments
-    #[test]
-    fn test_mutual_inductance_to_linear() {
-        let linspace = |start, end, n| {
-            (0..n)
-                .map(|i| start + (i as f64 / (n - 1) as f64) * (end - start))
-                .collect::<Vec<f64>>()
-        };
+    /// Evenly spaced values from start to end
+    fn linspace(start: f64, end: f64, n: usize) -> Vec<f64> {
+        (0..n)
+            .map(|i| start + (i as f64 / (n - 1) as f64) * (end - start))
+            .collect::<Vec<f64>>()
+    }
 
-        let diff = |v: &[f64]| {
-            v[1..]
-                .iter()
-                .zip(v[0..v.len() - 1].iter())
-                .map(|(&b, &a)| b - a)
-                .collect::<Vec<f64>>()
-        };
+    /// First-order forward difference; returns n-1 sized output
+    fn diff(v: &[f64]) -> Vec<f64> {
+        v[1..]
+            .iter()
+            .zip(v[0..v.len() - 1].iter())
+            .map(|(&b, &a)| b - a)
+            .collect::<Vec<f64>>()
+    }
 
-        let discretize_circular_filament = |r: f64, z, ndiscr| {
-            let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
-                .iter()
-                .map(|v| r * v.cos())
-                .collect();
-            let y: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
-                .iter()
-                .map(|v| r * v.sin())
-                .collect();
-            let z: Vec<f64> = (0..ndiscr).map(|_| z).collect();
-            (x, y, z)
-        };
+    /// Convert circular filament to ndiscr-1 piecewise linear segments
+    /// (ndiscr points)
+    fn discretize_circular_filament(
+        r: f64,
+        z: f64,
+        ndiscr: usize,
+    ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+            .iter()
+            .map(|v| r * v.cos())
+            .collect();
+        let y: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+            .iter()
+            .map(|v| r * v.sin())
+            .collect();
+        let z: Vec<f64> = (0..ndiscr).map(|_| z).collect();
+        (x, y, z)
+    }
 
-        // Make some circular filaments
-        let r = 1.0 / PI; // [m] some number
-        let z = 1.0 / E; // [m] some number
-
-        let rfil = [r, r + E / 4.0];
-        let zfil = [z, -z];
-        let nfil = [PI, E];
-
+    /// Make an example helical path for testing
+    fn example_helix() -> (Vec<f64>, Vec<f64>, Vec<f64>)  {
         // Make a slightly tilted helical piecewise-linear filament
         let n = 10_000;
         let xc = [0.1, -0.1]; // Start and end of centerline path
         let yc = [-0.05, 0.2];
-        let zc = [-2.0 * z, 2.0 * z];
+        let zc = [-2.0, 2.0];
 
         let xc: Vec<f64> = linspace(xc[0], xc[1], n);
         let yc: Vec<f64> = linspace(yc[0], yc[1], n);
@@ -915,7 +912,28 @@ mod test {
         let dlxfil1 = diff(&x);
         let dlyfil1 = diff(&y);
         let dlzfil1 = diff(&z);
-        let dlxyzfil1 = (&dlxfil1[..], &dlyfil1[..], &dlzfil1[..]);
+        // let dlxyzfil1 = (&dlxfil1[..], &dlyfil1[..], &dlzfil1[..]);
+        (dlxfil1, dlyfil1, dlzfil1)
+    }
+
+    /// Make sure the circular-to-linear mutual inductance calc matches
+    /// the result achieved by discretizing the circular filament
+    /// into linear segments, and matches between serial and parallel variants
+    #[test]
+    fn test_mutual_inductance_to_linear() {
+        // Make some circular filaments
+        let r = 1.0 / PI; // [m] some number
+        let z = 1.0 / E; // [m] some number
+
+        let rfil = [r, r + E / 4.0];
+        let zfil = [z, -z];
+        let nfil = [PI, E];
+
+        // Make a slightly tilted helical piecewise-linear filament
+        let xyzfil1 = example_helix();
+        let (x, y, z) = (&xyzfil1.0[..], &xyzfil1.1[..], &xyzfil1.2[..]);
+        let dlxyzfil1 = (&diff(x)[..], &diff(y)[..], &diff(z)[..]);
+        let n = x.len();
 
         // Get mutual inductance by purpose-made calc
         // [H]
