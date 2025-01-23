@@ -16,7 +16,7 @@ use crate::{MU0_OVER_4PI, MU_0};
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
@@ -43,7 +43,7 @@ use crate::{MU0_OVER_4PI, MU_0};
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_circular_filament_par(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     rzobs: (&[f64], &[f64]),
     out: &mut [f64],
 ) -> Result<(), &'static str> {
@@ -64,7 +64,7 @@ pub fn flux_circular_filament_par(
 
     // Run calcs
     outc.zip(rprimec.zip(zprimec))
-        .try_for_each(|(outc, (rc, zc))| flux_circular_filament(irzfil, (rc, zc), outc))?;
+        .try_for_each(|(outc, (rc, zc))| flux_circular_filament(rzifil, (rc, zc), outc))?;
 
     Ok(())
 }
@@ -74,7 +74,7 @@ pub fn flux_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
@@ -101,12 +101,12 @@ pub fn flux_circular_filament_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_circular_filament(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     rzobs: (&[f64], &[f64]),
     out: &mut [f64],
 ) -> Result<(), &'static str> {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
+    let (rfil, zfil, ifil) = rzifil;
     let (rprime, zprime) = rzobs;
 
     // Check lengths; Error if they do not match
@@ -124,7 +124,7 @@ pub fn flux_circular_filament(
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
             out[i] +=
-                flux_circular_filament_scalar((ifil[j], rfil[j], zfil[j]), (rprime[i], zprime[i]));
+                flux_circular_filament_scalar((rfil[j], zfil[j], ifil[j]), (rprime[i], zprime[i]));
         }
     }
 
@@ -136,7 +136,7 @@ pub fn flux_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 /// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
 ///
@@ -167,9 +167,9 @@ pub fn flux_circular_filament(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 #[inline]
-pub fn flux_circular_filament_scalar(irzfil: (f64, f64, f64), rzobs: (f64, f64)) -> f64 {
+pub fn flux_circular_filament_scalar(rzifil: (f64, f64, f64), rzobs: (f64, f64)) -> f64 {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
+    let (rfil, zfil, ifil) = rzifil;
     let (rprime, zprime) = rzobs;
     // Evaluate
     let rrprime = rfil * rprime;
@@ -185,7 +185,7 @@ pub fn flux_circular_filament_scalar(irzfil: (f64, f64, f64), rzobs: (f64, f64))
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
@@ -215,7 +215,7 @@ pub fn flux_circular_filament_scalar(irzfil: (f64, f64, f64), rzobs: (f64, f64))
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_density_circular_filament_par(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     rzobs: (&[f64], &[f64]),
     out: (&mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
@@ -240,7 +240,7 @@ pub fn flux_density_circular_filament_par(
     outrc
         .zip(outzc.zip(rprimec.zip(zprimec)))
         .try_for_each(|(orc, (ozc, (rc, zc)))| {
-            flux_density_circular_filament(irzfil, (rc, zc), (orc, ozc))
+            flux_density_circular_filament(rzifil, (rc, zc), (orc, ozc))
         })?;
 
     Ok(())
@@ -250,7 +250,7 @@ pub fn flux_density_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
@@ -280,12 +280,12 @@ pub fn flux_density_circular_filament_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn flux_density_circular_filament(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     rzobs: (&[f64], &[f64]),
     out: (&mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
+    let (rfil, zfil, ifil) = rzifil;
     let (rprime, zprime) = rzobs;
     let (out_r, out_z) = out;
 
@@ -318,7 +318,7 @@ pub fn flux_density_circular_filament(
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
             let (br, bz) = flux_density_circular_filament_scalar(
-                (ifil[i], rfil[i], zfil[i]),
+                (rfil[i], zfil[i], ifil[i]),
                 (rprime[j], zprime[j]),
             );
             out_r[j] += br;
@@ -333,7 +333,7 @@ pub fn flux_density_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `irzfil`:  (A, m, m) current, r-coord, and z-coord of filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 ///
 /// # Returns
@@ -367,11 +367,11 @@ pub fn flux_density_circular_filament(
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 #[inline]
 pub fn flux_density_circular_filament_scalar(
-    irzfil: (f64, f64, f64),
+    rzifil: (f64, f64, f64),
     rzobs: (f64, f64),
 ) -> (f64, f64) {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
+    let (rfil, zfil, ifil) = rzifil;
     let (rprime, zprime) = rzobs;
 
     // Evaluate
@@ -411,16 +411,15 @@ pub fn flux_density_circular_filament_scalar(
 /// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
 #[inline]
 pub fn flux_density_circular_filament_cartesian_scalar(
-    irzfil: (f64, f64, f64),
+    rzifil: (f64, f64, f64),
     xyzobs: (f64, f64, f64),
 ) -> (f64, f64, f64) {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
     let (x, y, z) = xyzobs;
     // Convert cartesian point to cylindrical
     let (robs, phiobs, zobs) = crate::math::cartesian_to_cylindrical(x, y, z);
     // Get axisymmetric B-field
-    let (br, bz) = flux_density_circular_filament_scalar((ifil, rfil, zfil), (robs, zobs));
+    let (br, bz) = flux_density_circular_filament_scalar(rzifil, (robs, zobs));
     // Convert axisymmetric B-field to cartesian
     let (bx, by, bz) = (br * libm::cos(phiobs), br * libm::sin(phiobs), bz);
     (bx, by, bz)
@@ -431,12 +430,12 @@ pub fn flux_density_circular_filament_cartesian_scalar(
 ///
 /// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
 pub fn flux_density_circular_filament_cartesian(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     xyzobs: (&[f64], &[f64], &[f64]),
     bxyz_out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Unpack
-    let (ifil, rfil, zfil) = irzfil;
+    let (rfil, zfil, ifil) = rzifil;
     let (x, y, z) = xyzobs;
     let (bx, by, bz) = bxyz_out;
 
@@ -465,10 +464,10 @@ pub fn flux_density_circular_filament_cartesian(
         for i in 0..n {
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
-            let irzfil_i = (ifil[i], rfil[i], zfil[i]);
+            let rzifil_i = (rfil[i], zfil[i], ifil[i]);
             let xyzobs_j = (x[j], y[j], z[j]);
             let (bxo, byo, bzo) =
-                flux_density_circular_filament_cartesian_scalar(irzfil_i, xyzobs_j);
+                flux_density_circular_filament_cartesian_scalar(rzifil_i, xyzobs_j);
             bx[j] += bxo;
             by[j] += byo;
             bz[j] += bzo;
@@ -484,7 +483,7 @@ pub fn flux_density_circular_filament_cartesian(
 ///
 /// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
 pub fn flux_density_circular_filament_cartesian_par(
-    irzfil: (&[f64], &[f64], &[f64]),
+    rzifil: (&[f64], &[f64], &[f64]),
     xyzobs: (&[f64], &[f64], &[f64]),
     bxyz_out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
@@ -512,7 +511,7 @@ pub fn flux_density_circular_filament_cartesian_par(
         .try_for_each(|(xci, (yci, (zci, (bxci, (byci, bzci)))))| {
             let xyzobs_i = (xci, yci, zci);
             let bxyz_out_i = (bxci, byci, bzci);
-            flux_density_circular_filament_cartesian(irzfil, xyzobs_i, bxyz_out_i)
+            flux_density_circular_filament_cartesian(rzifil, xyzobs_i, bxyz_out_i)
         })?;
 
     Ok(())
@@ -925,7 +924,7 @@ mod test {
         let (rfil, zfil, nfil) = example_circular_filaments();
         // Use number-of-turns as the filament current
         // so that the result is in per-amp units
-        let irzfil = (&nfil[..], &rfil[..], &zfil[..]);
+        let rzifil = (&rfil[..], &zfil[..], &nfil[..]);
 
         // Make a slightly tilted helical piecewise-linear filament
         let xyzfil1 = example_helix();
@@ -934,10 +933,10 @@ mod test {
 
         // Do calcs
         let (bx0, by0, bz0) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
-        flux_density_circular_filament_cartesian(irzfil, xyzobs, (bx0, by0, bz0)).unwrap();
+        flux_density_circular_filament_cartesian(rzifil, xyzobs, (bx0, by0, bz0)).unwrap();
 
         let (bx1, by1, bz1) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
-        flux_density_circular_filament_cartesian_par(irzfil, xyzobs, (bx1, by1, bz1)).unwrap();
+        flux_density_circular_filament_cartesian_par(rzifil, xyzobs, (bx1, by1, bz1)).unwrap();
 
         let (bx2, by2, bz2) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
         bx2.fill(0.0);
@@ -1098,7 +1097,7 @@ mod test {
                 let mut br = [0.0];
                 let mut bz = [0.0];
                 flux_density_circular_filament(
-                    (&[1.0], &[rfil], &[zfil]),
+                    (&[rfil], &[zfil], &[1.0]),
                     (&[*r], &[*z]),
                     (&mut br, &mut bz),
                 )
@@ -1111,7 +1110,7 @@ mod test {
                 // psi = integral(dot(A, dL)) =  2pi * r * a
                 let psi_from_a = 2.0 * PI * *r * vp(*r, *z);
                 let mut psi = [0.0];
-                flux_circular_filament((&[1.0], &[rfil], &[zfil]), (&[*r], &[*z]), &mut psi)
+                flux_circular_filament((&[rfil], &[zfil], &[1.0]), (&[*r], &[*z]), &mut psi)
                     .unwrap();
                 println!("{psi:?}, {psi_from_a}");
                 assert!(approx(psi_from_a, psi[0], 1e-10, 0.0)); // Should be very close to float roundoff
@@ -1145,16 +1144,16 @@ mod test {
         let out3 = &mut [3.0; NOBS];
 
         // Flux
-        flux_circular_filament((&ifil, &rfil, &zfil), (&rprime, &zprime), out0).unwrap();
-        flux_circular_filament_par((&ifil, &rfil, &zfil), (&rprime, &zprime), out1).unwrap();
+        flux_circular_filament((&rfil, &zfil, &ifil), (&rprime, &zprime), out0).unwrap();
+        flux_circular_filament_par((&rfil, &zfil, &ifil), (&rprime, &zprime), out1).unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out1[i]);
         }
 
         // Flux density
-        flux_density_circular_filament((&ifil, &rfil, &zfil), (&rprime, &zprime), (out0, out1))
+        flux_density_circular_filament((&rfil, &zfil, &ifil), (&rprime, &zprime), (out0, out1))
             .unwrap();
-        flux_density_circular_filament_par((&ifil, &rfil, &zfil), (&rprime, &zprime), (out2, out3))
+        flux_density_circular_filament_par((&rfil, &zfil, &ifil), (&rprime, &zprime), (out2, out3))
             .unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out2[i]);
