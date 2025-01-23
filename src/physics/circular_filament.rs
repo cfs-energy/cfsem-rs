@@ -887,7 +887,7 @@ mod test {
     }
 
     /// Make an example helical path for testing
-    fn example_helix() -> (Vec<f64>, Vec<f64>, Vec<f64>)  {
+    fn example_helix() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
         // Make a slightly tilted helical piecewise-linear filament
         let n = 10_000;
         let xc = [0.1, -0.1]; // Start and end of centerline path
@@ -909,11 +909,21 @@ mod test {
             (&mut x, &mut y, &mut z),
         )
         .unwrap();
-        let dlxfil1 = diff(&x);
-        let dlyfil1 = diff(&y);
-        let dlzfil1 = diff(&z);
-        // let dlxyzfil1 = (&dlxfil1[..], &dlyfil1[..], &dlzfil1[..]);
-        (dlxfil1, dlyfil1, dlzfil1)
+
+        (x, y, z)
+    }
+
+    /// Example set of ciruclar filaments with (r, z, n_turns) values
+    fn example_circular_filaments() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        // Make some circular filaments
+        let r = 1.0 / PI; // [m] some number
+        let z = 1.0 / E; // [m] some number
+
+        let rfil = [r, r + E / 4.0, r + E / 2.0].to_vec();
+        let zfil = [z, -z, 0.0].to_vec();
+        let nfil = [PI, E, E / 2.0].to_vec();
+
+        (rfil, zfil, nfil)
     }
 
     /// Make sure the circular-to-linear mutual inductance calc matches
@@ -922,12 +932,7 @@ mod test {
     #[test]
     fn test_mutual_inductance_to_linear() {
         // Make some circular filaments
-        let r = 1.0 / PI; // [m] some number
-        let z = 1.0 / E; // [m] some number
-
-        let rfil = [r, r + E / 4.0];
-        let zfil = [z, -z];
-        let nfil = [PI, E];
+        let (rfil, zfil, nfil) = example_circular_filaments();
 
         // Make a slightly tilted helical piecewise-linear filament
         let xyzfil1 = example_helix();
