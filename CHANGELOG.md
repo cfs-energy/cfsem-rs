@@ -4,10 +4,14 @@
 
 ### Added
 
+* Add libm dep for reproducible trig functions
+    * Rust std/core defers to libc or other platform-dependent math libraries for trig functions, which can cause platform-dependent results
+    * libm is a pure rust implementation of most functions from libc, and is platform-independent to the extent that the processor's implementation of floating point math conforms to IEEE-754
 * Add scalar calculations of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
     * Scalar calculations now used as the inner function in the vector loops
     * This produces no performance regression, and some improvements in a few cases (up to a 4x speedup for some edge cases in the parallel variants)
 * Add `mutual_inductance_circular_to_linear` family of functions for calculating mutual inductance between circular filaments and piecewise-linear paths
+* Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
 
 
