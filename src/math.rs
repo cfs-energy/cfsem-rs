@@ -104,3 +104,19 @@ pub fn cross3(x0: f64, y0: f64, z0: f64, x1: f64, y1: f64, z1: f64) -> (f64, f64
 pub fn dot3(x0: f64, y0: f64, z0: f64, x1: f64, y1: f64, z1: f64) -> f64 {
     x0.mul_add(x1, y0.mul_add(y1, z0 * z1))
 }
+
+/// Convert a point from cartesian to cylindrical coordinates.
+#[inline]
+pub fn cartesian_to_cylindrical(x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+    let r = rss3(x, y, 0.0);
+    let phi = libm::atan2(y, x);
+    (r, phi, z)
+}
+
+/// Convert a point in cylindrical coordinates to cartesian.
+#[inline]
+pub fn cylindrical_to_cartesian(r: f64, phi: f64, z: f64) -> (f64, f64, f64) {
+    let x = r * libm::cos(phi);
+    let y = r * libm::sin(phi);
+    (x, y, z)
+}

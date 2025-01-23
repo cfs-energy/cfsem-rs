@@ -4,7 +4,12 @@
 
 ### Added
 
-* Add scalar calculation of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
+* Add scalar calculations of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
+    * Scalar calculations now used as the inner function in the vector loops
+    * This produces no performance regression, and some improvements in a few cases (up to a 4x speedup for some edge cases in the parallel variants)
+* Add `mutual_inductance_circular_to_linear` family of functions for calculating mutual inductance between circular filaments and piecewise-linear paths
+* Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
+
 
 # Changelog
 

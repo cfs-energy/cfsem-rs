@@ -423,6 +423,27 @@ pub fn flux_density_circular_filament_scalar(
     (br, bz)
 }
 
+/// Flux density of a circular filament in cartesian form,
+/// at a location given in cartesian coordinates.
+/// 
+/// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
+#[inline]
+pub fn flux_density_circular_filament_cartesian_scalar(
+    irzfil: (f64, f64, f64),
+    xyzobs: (f64, f64, f64)
+) -> (f64, f64, f64) {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (x, y, z) = xyzobs;
+    // Convert cartesian point to cylindrical
+    let (robs, phiobs, zobs) = crate::math::cartesian_to_cylindrical(x, y, z);
+    // Get axisymmetric B-field
+    let (br, bz) = flux_density_circular_filament_scalar(ifil, rfil, zfil, robs, zobs);
+    // Convert axisymmetric B-field to cartesian
+    let (bx, by, bz) = (-br * libm::sin(phiobs), br * libm::cos(phiobs), bz);
+    (bx, by, bz)
+}
+
 /// Off-axis A_phi component for a circular current filament in vacuum.
 /// This variant of the function is parallelized over chunks of observation points.
 ///
@@ -613,8 +634,8 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     let path_dr = rss3(dlxfil, dlyfil, 0.0); // [m]
 
     //    phi = tan^-1(y/x)
-    let path_phi0 = f64::atan2(xyzfil0.1, xyzfil0.0);
-    let path_phi1 = f64::atan2(xyzfil1.1, xyzfil1.0);
+    let path_phi0 = libm::atan2(xyzfil0.1, xyzfil0.0);
+    let path_phi1 = libm::atan2(xyzfil1.1, xyzfil1.0);
 
     //    midpoint is best for capturing curvature in piecewise-linear paths properly
     let path_r_mid = path_r + path_dr / 2.0; // [m]
@@ -622,16 +643,18 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     let path_phi_mid = (path_phi0 + path_phi1) / 2.0;
 
     // Get cylindrical vector potential at linear segment midpoint
-    // for a unit current, which is equivalent to mutual inductance per unit length
+    // for a unit current (1.0A * number of turns), which is equivalent
+    // to mutual inductance per unit length of the target filament
     // [H/m]
-    let a_phi_per_A = rznfil.2
-        * vector_potential_circular_filament_scalar(
-            1.0, rznfil.0, rznfil.1, path_r_mid, path_z_mid,
-        );
+    let a_phi_per_A = vector_potential_circular_filament_scalar(
+        rznfil.2, rznfil.0, rznfil.1, path_r_mid, path_z_mid,
+    );
 
     // Convert cylindrical vector potential to cartesian
-    let a_x_per_A = -a_phi_per_A * path_phi_mid.sin();
-    let a_y_per_A = a_phi_per_A * path_phi_mid.cos();
+    // Note that the conversion of a _point_ in cylindrical to cartesian
+    // is different from the conversion of a _vector_ in cylindrical to cartesian.
+    let a_x_per_A = -a_phi_per_A * libm::sin(path_phi_mid);
+    let a_y_per_A = a_phi_per_A * libm::cos(path_phi_mid);
     let a_z_per_A = 0.0;
 
     // Recover mutual inductance as dot(A, dL)/I
@@ -835,7 +858,12 @@ mod test {
 
         // Parallel and serial should match exactly, although changing the sum order
         // produce slight differences due to float roundoff
-        assert!(approx(mutual_inductance, mutual_inductance_par, 1e-10, 1e-12));
+        assert!(approx(
+            mutual_inductance,
+            mutual_inductance_par,
+            1e-10,
+            1e-12
+        ));
         // The brute force discretization calc takes an excessive
         // amount of discretization to reach accuracy <1e-3, but converges rapidly to
         // about 1e-2 relative accuracy
