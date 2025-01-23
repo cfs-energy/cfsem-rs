@@ -128,7 +128,7 @@ pub fn flux_circular_filament(
     for i in 0..n {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
-            // are pulled to the outer scope by the compiler and do not affect performance
+            // can be pulled to the outer scope by the compiler and do not affect performance
             out_psi[i] +=
                 flux_circular_filament_scalar(ifil[j], rfil[j], zfil[j], rprime[i], zprime[i]);
         }
@@ -333,7 +333,7 @@ pub fn flux_density_circular_filament(
     for i in 0..n {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
-            // are pulled to the outer scope by the compiler and do not affect performance
+            // can be pulled to the outer scope by the compiler and do not affect performance
             let (br, bz) = flux_density_circular_filament_scalar(
                 ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
             );
@@ -423,14 +423,14 @@ pub fn flux_density_circular_filament_scalar(
     (br, bz)
 }
 
-/// Flux density of a circular filament in cartesian form,
+/// Flux density of a circular filament in cartesian form
 /// at a location given in cartesian coordinates.
-/// 
+///
 /// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
 #[inline]
 pub fn flux_density_circular_filament_cartesian_scalar(
     irzfil: (f64, f64, f64),
-    xyzobs: (f64, f64, f64)
+    xyzobs: (f64, f64, f64),
 ) -> (f64, f64, f64) {
     // Unpack
     let (ifil, rfil, zfil) = irzfil;
@@ -442,6 +442,98 @@ pub fn flux_density_circular_filament_cartesian_scalar(
     // Convert axisymmetric B-field to cartesian
     let (bx, by, bz) = (-br * libm::sin(phiobs), br * libm::cos(phiobs), bz);
     (bx, by, bz)
+}
+
+/// Flux density of a circular filament in cartesian form
+/// at a set of locations given in cartesian coordinates.
+///
+/// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
+pub fn flux_density_circular_filament_cartesian(
+    irzfil: (&[f64], &[f64], &[f64]),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    bxyz_out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Unpack
+    let (ifil, rfil, zfil) = irzfil;
+    let (x, y, z) = xyzobs;
+    let (bx, by, bz) = bxyz_out;
+
+    // Check lengths
+    let n = ifil.len();
+    if rfil.len() != n || zfil.len() != n {
+        return Err("Length mismatch");
+    }
+
+    let m = x.len();
+    if y.len() != m || z.len() != m || bx.len() != m || by.len() != m || bz.len() != m {
+        return Err("Length mismatch");
+    }
+
+    // Zero output
+    bx.fill(0.0);
+    by.fill(0.0);
+    bz.fill(0.0);
+
+    // Do calcs
+    // Because we will parallelize over chunks of output points to avoid mutexes,
+    // the inner loop is over the circular filaments s.t. performance remains viable
+    // when examining the contribution of a large number of filaments to a small
+    // number of observation points.
+    for j in 0..m {
+        for i in 0..n {
+            // The inner function is inlined, so values that are reused between iterations
+            // can be pulled to the outer scope by the compiler and do not affect performance
+            let irzfil_i = (ifil[i], rfil[i], zfil[i]);
+            let xyzobs_j = (x[j], y[j], z[j]);
+            let (bxo, byo, bzo) =
+                flux_density_circular_filament_cartesian_scalar(irzfil_i, xyzobs_j);
+            bx[j] += bxo;
+            by[j] += byo;
+            bz[j] += bzo;
+        }
+    }
+
+    Ok(())
+}
+
+/// Flux density of a circular filament in cartesian form
+/// at a set of locations given in cartesian coordinates.
+/// Parallelized over chunks of observation points.
+///
+/// For additional documentation and commentary, see [flux_density_circular_filament_scalar].
+pub fn flux_density_circular_filament_cartesian_par(
+    irzfil: (&[f64], &[f64], &[f64]),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    bxyz_out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Unpack
+    let (x, y, z) = xyzobs;
+    let (bx, by, bz) = bxyz_out;
+
+    // Chunk
+    let ncores = std::thread::available_parallelism()
+        .unwrap_or(NonZeroUsize::MIN)
+        .get();
+
+    let n = (bx.len() / ncores).max(1);
+
+    let xc = x.par_chunks(n);
+    let yc = y.par_chunks(n);
+    let zc = z.par_chunks(n);
+
+    let outbxc = bx.par_chunks_mut(n);
+    let outbyc = by.par_chunks_mut(n);
+    let outbzc = bz.par_chunks_mut(n);
+
+    // Evaluate
+    xc.zip(yc.zip(zc.zip(outbxc.zip(outbyc.zip(outbzc)))))
+        .try_for_each(|(xci, (yci, (zci, (bxci, (byci, bzci)))))| {
+            let xyzobs_i = (xci, yci, zci);
+            let bxyz_out_i = (bxci, byci, bzci);
+            flux_density_circular_filament_cartesian(irzfil, xyzobs_i, bxyz_out_i)
+        })?;
+
+    Ok(())
 }
 
 /// Off-axis A_phi component for a circular current filament in vacuum.
@@ -541,7 +633,7 @@ pub fn vector_potential_circular_filament(
     for i in 0..n {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
-            // are pulled to the outer scope by the compiler and do not affect performance
+            // can be pulled to the outer scope by the compiler and do not affect performance
             out_phi[j] += vector_potential_circular_filament_scalar(
                 ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
             );
@@ -697,7 +789,7 @@ pub fn mutual_inductance_circular_to_linear(
     for i in 0..n - 1 {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
-            // are pulled to the outer scope by the compiler and do not affect performance
+            // can be pulled to the outer scope by the compiler and do not affect performance
             let xyzfil0 = (xyzfil.0[i], xyzfil.1[i], xyzfil.2[i]);
             let xyzfil1 = (xyzfil.0[i + 1], xyzfil.1[i + 1], xyzfil.2[i + 1]);
             mutual_inductance += mutual_inductance_circular_to_linear_scalar(
