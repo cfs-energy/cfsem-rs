@@ -48,7 +48,7 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             flux_circular_filament(
-                                (&current, &rfil, &zfil),
+                                (&rfil, &zfil, &current),
                                 (&robs, &zobs),
                                 &mut out,
                             )
@@ -71,7 +71,7 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             flux_circular_filament_par(
-                                (&current, &rfil, &zfil),
+                                (&rfil, &zfil, &current),
                                 (&robs, &zobs),
                                 &mut out,
                             )
@@ -124,7 +124,9 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             vector_potential_circular_filament(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
@@ -145,7 +147,9 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             vector_potential_circular_filament_par(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
@@ -196,7 +200,7 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament(
-                            (&current, &rfil, &zfil),
+                            (&rfil, &zfil, &current),
                             (&robs, &zobs),
                             (&mut out, &mut out1),
                         ))
@@ -216,7 +220,7 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament_par(
-                            (&current, &rfil, &zfil),
+                            (&rfil, &zfil, &current),
                             (&robs, &zobs),
                             (&mut out, &mut out1),
                         ))

@@ -17,7 +17,7 @@
 ### Changed
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
-* !Consolidate function signature of `flux_density_circular_filament[_par]`
+* !Consolidate function signatures of `flux_density_circular_filament[_par]`, `flux_circular_filament[_par]`, and `vector_potential_circular_filament[_par]`
 
 # Changelog
 

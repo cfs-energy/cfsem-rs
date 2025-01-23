@@ -522,12 +522,9 @@ pub fn flux_density_circular_filament_cartesian_par(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_phi`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation points, length `n`
+/// * `out`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
 ///
 /// # Commentary
 ///
@@ -541,13 +538,14 @@ pub fn flux_density_circular_filament_cartesian_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn vector_potential_circular_filament_par(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_phi: &mut [f64],
+    rzifil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: &mut [f64],
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (rfil, zfil, ifil) = rzifil;
+    let (rprime, zprime) = rzobs;
+
     // Chunk inputs
     let ncores = std::thread::available_parallelism()
         .unwrap_or(NonZeroUsize::MIN)
@@ -558,12 +556,12 @@ pub fn vector_potential_circular_filament_par(
     let rprimec = rprime.par_chunks(n);
     let zprimec = zprime.par_chunks(n);
 
-    let outc = out_phi.par_chunks_mut(n);
+    let outc = out.par_chunks_mut(n);
 
     // Run calcs
     outc.zip(rprimec.zip(zprimec))
         .try_for_each(|(outc, (rc, zc))| {
-            vector_potential_circular_filament(ifil, rfil, zfil, rc, zc, outc)
+            vector_potential_circular_filament((rfil, zfil, ifil), (rc, zc), outc)
         })?;
 
     Ok(())
@@ -573,12 +571,9 @@ pub fn vector_potential_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in each filament, length `m`
-/// * `rfil`:    (m) r-coord of each filament, length `m`
-/// * `zfil`:    (m) z-coord of each filament, length `m`
-/// * `rprime`:  (m) r-coord of each observation point, length `n`
-/// * `zprime`:  (m) z-coord of each observation point, length `n`
-/// * `out_phi`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation points, length `n`
+/// * `out`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
 ///
 /// # Commentary
 ///
@@ -592,30 +587,32 @@ pub fn vector_potential_circular_filament_par(
 ///         “Simple Analytic Expressions for the Magnetic Field of a Circular Current Loop,”
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 pub fn vector_potential_circular_filament(
-    ifil: &[f64],
-    rfil: &[f64],
-    zfil: &[f64],
-    rprime: &[f64],
-    zprime: &[f64],
-    out_phi: &mut [f64],
+    rzifil: (&[f64], &[f64], &[f64]),
+    rzobs: (&[f64], &[f64]),
+    out: &mut [f64],
 ) -> Result<(), &'static str> {
+    // Unpack
+    let (rfil, zfil, ifil) = rzifil;
+    let (rprime, zprime) = rzobs;
+
+    // Check lengths
     let n = ifil.len();
     let m = rprime.len();
 
-    // Check lengths; Error if they do not match
-    if rfil.len() != n || zfil.len() != n || zprime.len() != m || out_phi.len() != m {
+    if rfil.len() != n || zfil.len() != n || zprime.len() != m || out.len() != m {
         return Err("Length mismatch");
     }
 
     // Zero output
-    out_phi.fill(0.0);
+    out.fill(0.0);
 
     for i in 0..n {
         for j in 0..m {
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
-            out_phi[j] += vector_potential_circular_filament_scalar(
-                ifil[i], rfil[i], zfil[i], rprime[j], zprime[j],
+            out[j] += vector_potential_circular_filament_scalar(
+                (rfil[i], zfil[i], ifil[i]),
+                (rprime[j], zprime[j]),
             );
         }
     }
@@ -627,11 +624,8 @@ pub fn vector_potential_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `ifil`:    (A) current in filament
-/// * `rfil`:    (m) r-coord of filament
-/// * `zfil`:    (m) z-coord of filament
-/// * `rprime`:  (m) r-coord of observation point
-/// * `zprime`:  (m) z-coord of observation point
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 ///
 /// # Returns
 /// * `a_phi`: (V-s/m), phi-component of magnetic vector potential at observation location
@@ -649,12 +643,13 @@ pub fn vector_potential_circular_filament(
 ///         Jan. 01, 2001. Accessed: Sep. 06, 2022. [Online]. Available: <https://ntrs.nasa.gov/citations/20010038494>
 #[inline]
 pub fn vector_potential_circular_filament_scalar(
-    ifil: f64,
-    rfil: f64,
-    zfil: f64,
-    rprime: f64,
-    zprime: f64,
+    rzifil: (f64, f64, f64),
+    rzobs: (f64, f64),
 ) -> f64 {
+    // Unpack
+    let (rfil, zfil, ifil) = rzifil;
+    let (rprime, zprime) = rzobs;
+
     // Eq. 1 and 2 of Simpson2001 give a formula for the vector potential of a loop in spherical coordinates.
     // Here, we use that formula adjusted to cylindrical coordinates.
     // r_spherical*sin(theta) = r_cylindrical
@@ -718,9 +713,7 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     // for a unit current (1.0A * number of turns), which is equivalent
     // to mutual inductance per unit length of the target filament
     // [H/m]
-    let a_phi_per_A = vector_potential_circular_filament_scalar(
-        rznfil.2, rznfil.0, rznfil.1, path_r_mid, path_z_mid,
-    );
+    let a_phi_per_A = vector_potential_circular_filament_scalar(rznfil, (path_r_mid, path_z_mid));
 
     // Convert cylindrical vector potential to cartesian
     // Note that the conversion of a _point_ in cylindrical to cartesian
@@ -1067,7 +1060,7 @@ mod test {
         let vp = |r: f64, z: f64| {
             let mut out = [0.0];
 
-            vector_potential_circular_filament(&[1.0], &[rfil], &[zfil], &[r], &[z], &mut out)
+            vector_potential_circular_filament((&[rfil], &[zfil], &[1.0]), (&[r], &[z]), &mut out)
                 .unwrap();
 
             out[0]
@@ -1163,8 +1156,9 @@ mod test {
         // Vector potential
         let out0 = &mut [0.0; NOBS]; // Reinit with different values to test zeroing
         let out1 = &mut [1.0; NOBS];
-        vector_potential_circular_filament(&ifil, &rfil, &zfil, &rprime, &zprime, out0).unwrap();
-        vector_potential_circular_filament_par(&ifil, &rfil, &zfil, &rprime, &zprime, out1)
+        vector_potential_circular_filament((&rfil, &zfil, &ifil), (&rprime, &zprime), out0)
+            .unwrap();
+        vector_potential_circular_filament_par((&rfil, &zfil, &ifil), (&rprime, &zprime), out1)
             .unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out1[i]);
