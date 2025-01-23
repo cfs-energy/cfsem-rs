@@ -440,7 +440,7 @@ pub fn flux_density_circular_filament_cartesian_scalar(
     // Get axisymmetric B-field
     let (br, bz) = flux_density_circular_filament_scalar(ifil, rfil, zfil, robs, zobs);
     // Convert axisymmetric B-field to cartesian
-    let (bx, by, bz) = (-br * libm::sin(phiobs), br * libm::cos(phiobs), bz);
+    let (bx, by, bz) = (br * libm::cos(phiobs), br * libm::sin(phiobs), bz);
     (bx, by, bz)
 }
 
@@ -926,11 +926,103 @@ mod test {
         (rfil, zfil, nfil)
     }
 
+    /// Make sure that the cylindrical-to-cartesian conversion produces the
+    /// same result achieved by discretizing the circular filament into linear
+    /// segments, and that the serial and parallel variants produce the same result
+    #[test]
+    fn test_flux_density_circular_filament_cartesian() {
+        // It takes a massive amount of discretization to achieve
+        // better relative tolerance in the linear discretized calc,
+        // and that discretization ultimately causes the accumulated
+        // float roundoff error from the extra addition operations
+        // to outcompete the improvement from increasing geometric
+        // fidelity.
+        let rtol = 2e-2;
+        let atol = 1e-10;
+
+        // Make some circular filaments
+        let (rfil, zfil, nfil) = example_circular_filaments();
+        // Use number-of-turns as the filament current
+        // so that the result is in per-amp units
+        let irzfil = (&nfil[..], &rfil[..], &zfil[..]);
+
+        // Make a slightly tilted helical piecewise-linear filament
+        let xyzfil1 = example_helix();
+        let xyzobs = (&xyzfil1.0[..], &xyzfil1.1[..], &xyzfil1.2[..]);
+        let x = &xyzfil1.0;
+
+        // Do calcs
+        let (bx0, by0, bz0) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
+        flux_density_circular_filament_cartesian(irzfil, xyzobs, (bx0, by0, bz0)).unwrap();
+
+        let (bx1, by1, bz1) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
+        flux_density_circular_filament_cartesian_par(irzfil, xyzobs, (bx1, by1, bz1)).unwrap();
+
+        let (bx2, by2, bz2) = (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
+        bx2.fill(0.0);
+        by2.fill(0.0);
+        bz2.fill(0.0);
+        for i in 0..rfil.len() {
+            // Set up inputs
+            let (r, z, nturns) = (rfil[i], zfil[i], nfil[i]);
+            let ndiscr = 400;
+            let xyzfil0 = discretize_circular_filament(r, z, ndiscr);
+            let xyzfil0 = (&xyzfil0.0[..], &xyzfil0.1[..], &xyzfil0.2[..]);
+            let dlxyzfil0 = (
+                &diff(xyzfil0.0)[..],
+                &diff(xyzfil0.1)[..],
+                &diff(xyzfil0.2)[..],
+            );
+            let ifil = &mut xyzfil0.0.to_vec()[..ndiscr - 1]; // Use number of turns for this circular fil as filament current
+            ifil.fill(nturns);
+            let (xcontrib, ycontrib, zcontrib) =
+                (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
+
+            // Do calc
+            crate::physics::linear_filament::flux_density_linear_filament_par(
+                xyzobs,
+                (
+                    &xyzfil0.0[..ndiscr - 1],
+                    &xyzfil0.1[..ndiscr - 1],
+                    &xyzfil0.2[..ndiscr - 1],
+                ),
+                dlxyzfil0,
+                ifil,
+                (xcontrib, ycontrib, zcontrib),
+            )
+            .unwrap();
+
+            // Sum contributions
+            for j in 0..x.len() {
+                bx2[j] += xcontrib[j];
+                by2[j] += ycontrib[j];
+                bz2[j] += zcontrib[j];
+            }
+        }
+
+        // Compare
+        for j in 0..x.len() {
+            assert!(approx(bx0[j], bx1[j], 1e-12, 1e-12)); // Serial vs parallel
+            assert!(approx(bx0[j], bx2[j], rtol, atol)); // Serial vs discretized
+
+            assert!(approx(by0[j], by1[j], 1e-12, 1e-12)); // Serial vs parallel
+            assert!(approx(by0[j], by2[j], rtol, atol)); // Serial vs discretized
+
+            assert!(approx(bz0[j], bz1[j], 1e-12, 1e-12)); // Serial vs parallel
+            assert!(approx(bz0[j], bz2[j], rtol, atol)); // Serial vs discretized
+        }
+    }
+
     /// Make sure the circular-to-linear mutual inductance calc matches
     /// the result achieved by discretizing the circular filament
     /// into linear segments, and matches between serial and parallel variants
     #[test]
     fn test_mutual_inductance_to_linear() {
+        // It takes excessive discretization to achieve improved tolerance
+        // in the linear filament equivalent calc
+        let rtol = 1e-2;
+        let atol = 1e-12;
+
         // Make some circular filaments
         let (rfil, zfil, nfil) = example_circular_filaments();
 
@@ -982,7 +1074,7 @@ mod test {
         // The brute force discretization calc takes an excessive
         // amount of discretization to reach accuracy <1e-3, but converges rapidly to
         // about 1e-2 relative accuracy
-        assert!(approx(mutual_inductance_2, mutual_inductance, 1e-2, 1e-12));
+        assert!(approx(mutual_inductance_2, mutual_inductance, rtol, atol));
     }
 
     /// Check that B = curl(A)

@@ -231,11 +231,10 @@ pub fn flux_density_linear_filament(
         return Err("Input length mismatch");
     }
 
-    for j in 0..m {
-        bx[j] = 0.0;
-        by[j] = 0.0;
-        bz[j] = 0.0;
-    }
+    // Zero inputs
+    bx.fill(0.0);
+    by.fill(0.0);
+    bz.fill(0.0);
 
     // For each filament, evaluate the contribution to each observation point
     for i in 0..n {
@@ -374,11 +373,9 @@ pub fn vector_potential_linear_filament(
         return Err("Input length mismatch");
     }
 
-    for j in 0..m {
-        ax[j] = 0.0;
-        ay[j] = 0.0;
-        az[j] = 0.0;
-    }
+    ax.fill(0.0);
+    ay.fill(0.0);
+    az.fill(0.0);
 
     // For each filament, evaluate the contribution to each observation point
     for i in 0..n {
