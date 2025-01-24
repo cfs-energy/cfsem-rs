@@ -13,11 +13,15 @@
 * Add `mutual_inductance_circular_to_linear` family of functions for calculating mutual inductance between circular filaments and piecewise-linear paths
 * Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
+* Add `decompose_filament` function for converting the start and end points of a filament to the midpoint and length vector
 
 ### Changed
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
-* !Consolidate function signatures of `flux_density_circular_filament[_par]`, `flux_circular_filament[_par]`, and `vector_potential_circular_filament[_par]`
+* !Consolidate function signatures of `flux_density_circular_filament[_par]`, `flux_circular_filament[_par]`, `vector_potential_circular_filament[_par]`, `flux_density_linear_filament[_par]`, `vector_potential_linear_filament[_par]`,
+and `inductance_piecewise_linear_filaments`
+    * For linear filament methods, this change formalizes the filament input as a point series describing piecewise-continuous segments with the same value of current, which is a functionality-breaking change
+* !Remove deprecated `biot_savart` module, which has been superceded by the `linear_filament` module
 
 # Changelog
 
