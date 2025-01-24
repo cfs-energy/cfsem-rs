@@ -412,12 +412,13 @@ pub fn vector_potential_linear_filament_scalar(
     // Evaluate
     let dl = (xyz1.0 - xyz0.0, xyz1.1 - xyz0.1, xyz1.2 - xyz0.2); // [m] filament vector
     let (xmid, ymid, zmid) = (
-        xyz0.0 + dl.0 / 2.0,
-        xyz0.1 + dl.1 / 2.0,
-        xyz0.2 + dl.2 / 2.0,
+        dl.0.mul_add(0.5, xyz0.0),
+        dl.1.mul_add(0.5, xyz0.1),
+        dl.2.mul_add(0.5, xyz0.2),
     ); // [m] filament midpoint
 
-    let (rx, ry, rz) = (xyzobs.0 - xmid, xyzobs.1 - ymid, xyzobs.2 - zmid); // [m] vector from filament midpoint to obs point
+    // [m] vector from filament midpoint to obs point
+    let (rx, ry, rz) = (xyzobs.0 - xmid, xyzobs.1 - ymid, xyzobs.2 - zmid);
     let rnorm = rss3(rx, ry, rz);
 
     // Scale factor shared between all components of A
@@ -642,7 +643,8 @@ mod test {
         // Flux density
         let ifil_vec = &xyzfil.0[..];
         flux_density_linear_filament(xyzp, xyzfil, dlxyzfil, ifil_vec, (out0, out1, out2)).unwrap();
-        flux_density_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil_vec, (out3, out4, out5)).unwrap();
+        flux_density_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil_vec, (out3, out4, out5))
+            .unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out3[i]);
             assert_eq!(out1[i], out4[i]);
@@ -659,8 +661,7 @@ mod test {
 
         // Vector potential
         vector_potential_linear_filament(xyzifil, xyzp, (out0, out1, out2)).unwrap();
-        vector_potential_linear_filament_par(xyzifil, xyzp, (out3, out4, out5))
-            .unwrap();
+        vector_potential_linear_filament_par(xyzifil, xyzp, (out3, out4, out5)).unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out3[i]);
             assert_eq!(out1[i], out4[i]);
