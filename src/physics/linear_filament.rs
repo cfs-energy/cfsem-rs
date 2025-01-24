@@ -595,13 +595,7 @@ mod test {
     use std::f64::consts::PI;
 
     use super::*;
-
-    /// Div/0-resistant approximate comparison
-    fn approx(truth: f64, val: f64, rtol: f64, atol: f64) -> bool {
-        let abs_err = (val - truth).abs();
-        let lim = rtol * truth.abs() + atol;
-        abs_err < lim
-    }
+    use crate::testing::*;
 
     /// Check that B = curl(A)
     #[test]

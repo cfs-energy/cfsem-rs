@@ -4,6 +4,9 @@ pub mod math;
 pub mod mesh;
 pub mod physics;
 
+#[cfg(test)]
+pub(crate) mod testing;
+
 /// (H/m) vacuum magnetic permeability.
 /// Value from 2022 CODATA recommended values, [NIST SPI 961](https://physics.nist.gov/cuu/pdf/wall_2022.pdf).
 pub const MU_0: f64 = 0.999_999_999_87 * core::f64::consts::PI * 4e-7; // [H/m]

@@ -1,0 +1,81 @@
+//! Test utilities
+
+use core::f64::consts::{E, PI};
+
+/// Div/0-resistant approximate comparison
+pub(crate) fn approx(truth: f64, val: f64, rtol: f64, atol: f64) -> bool {
+    let abs_err = (val - truth).abs();
+    let lim = rtol * truth.abs() + atol;
+    abs_err < lim
+}
+
+/// Evenly spaced values from start to end
+pub(crate) fn linspace(start: f64, end: f64, n: usize) -> Vec<f64> {
+    (0..n)
+        .map(|i| start + (i as f64 / (n - 1) as f64) * (end - start))
+        .collect::<Vec<f64>>()
+}
+
+/// First-order forward difference; returns n-1 sized output
+pub(crate) fn diff(v: &[f64]) -> Vec<f64> {
+    v[1..]
+        .iter()
+        .zip(v[0..v.len() - 1].iter())
+        .map(|(&b, &a)| b - a)
+        .collect::<Vec<f64>>()
+}
+
+/// Convert circular filament to ndiscr-1 piecewise linear segments
+/// (ndiscr points)
+pub(crate) fn discretize_circular_filament(r: f64, z: f64, ndiscr: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+        .iter()
+        .map(|v| r * v.cos())
+        .collect();
+    let y: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
+        .iter()
+        .map(|v| r * v.sin())
+        .collect();
+    let z: Vec<f64> = (0..ndiscr).map(|_| z).collect();
+    (x, y, z)
+}
+
+/// Make an example helical path for testing
+pub(crate) fn example_helix() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    // Make a slightly tilted helical piecewise-linear filament
+    let n = 10_000;
+    let xc = [0.1, -0.1]; // Start and end of centerline path
+    let yc = [-0.05, 0.2];
+    let zc = [-2.0, 2.0];
+
+    let xc: Vec<f64> = linspace(xc[0], xc[1], n);
+    let yc: Vec<f64> = linspace(yc[0], yc[1], n);
+    let zc: Vec<f64> = linspace(zc[0], zc[1], n);
+
+    let mut x = xc.clone();
+    let mut y = xc.clone();
+    let mut z = xc.clone();
+    crate::mesh::filament_helix_path(
+        (&xc, &yc, &zc),
+        (2.0 * E / 3.0, 0.0, 0.0),
+        0.5,
+        0.0,
+        (&mut x, &mut y, &mut z),
+    )
+    .unwrap();
+
+    (x, y, z)
+}
+
+/// Example set of ciruclar filaments with (r, z, n_turns) values
+pub(crate) fn example_circular_filaments() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    // Make some circular filaments
+    let r = 1.0 / PI; // [m] some number
+    let z = 1.0 / E; // [m] some number
+
+    let rfil = [r, r + E / 4.0, r + E / 2.0].to_vec();
+    let zfil = [z, -z, 0.0].to_vec();
+    let nfil = [PI, E, E / 2.0].to_vec();
+
+    (rfil, zfil, nfil)
+}
