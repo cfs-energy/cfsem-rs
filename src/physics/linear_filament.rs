@@ -457,8 +457,9 @@ pub fn body_force_density_linear_filament_scalar(
 ) -> (f64, f64, f64) {
     // Get magnetic flux density at target point
     let (bx, by, bz) = flux_density_linear_filament_scalar(xyzifil, xyzobs); // [T]
-                                                                             // Take JxB Lorentz force
-    cross3(jobs.0, jobs.1, jobs.2, bx, by, bz)
+
+    // Take JxB Lorentz force
+    cross3(jobs.0, jobs.1, jobs.2, bx, by, bz) // [N/m^3]
 }
 
 /// JxB (Lorentz) body force density (per volume) due to a linear current

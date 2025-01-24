@@ -6,7 +6,7 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{dot3, ellipe, ellipk, rss3};
+use crate::math::{cross3, dot3, ellipe, ellipk, rss3};
 
 use crate::{MU0_OVER_4PI, MU_0};
 
@@ -774,6 +774,30 @@ pub fn mutual_inductance_circular_to_linear(
     }
 
     Ok(mutual_inductance)
+}
+
+/// JxB (Lorentz) body force density (per volume) in cartesian form due to a circular current
+/// filament segment at an observation point in cartesian form with some current density (per area).
+///
+/// # Arguments
+///
+/// * `rzifil`:    (m, m, A-turns) r-coord, z-coord, and current of filament
+/// * `xyzobs`:    (m) Observation point coords
+/// * `jobs`:      (A/m^2) Current density vector at observation point
+///
+/// # Returns
+///
+/// * `jxb`:        (N/m^3) Body force density in cartesian form
+pub fn body_force_density_circular_filament_cartesian_scalar(
+    rzifil: (f64, f64, f64),
+    xyzobs: (f64, f64, f64),
+    jobs: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    // Get flux density in cartesian coordinates
+    let (bx, by, bz) = flux_density_circular_filament_cartesian_scalar(rzifil, xyzobs);
+
+    // Take JxB Lorentz force
+    cross3(jobs.0, jobs.1, jobs.2, bx, by, bz) // [N/m^3]
 }
 
 pub fn mutual_inductance_circular_to_linear_par(
