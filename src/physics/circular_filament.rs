@@ -957,13 +957,12 @@ mod test {
     use core::f64::consts::PI;
 
     use super::*;
-    use crate::testing::*;
+    use crate::{physics::linear_filament::body_force_density_linear_filament, testing::*};
 
     /// Make sure that force is equal and opposite
     /// and has the right sign for simple geometries
     #[test]
     fn test_body_force_density() {
-
         // Make some circular filaments
         let (rfil, zfil, nfil) = example_circular_filaments();
         // Use number-of-turns as the filament current
@@ -973,20 +972,56 @@ mod test {
         // Make a slightly tilted helical piecewise-linear filament
         let xyzfil1 = example_helix();
         let n = xyzfil1.0.len();
-        let xyzobs = (&xyzfil1.0[..n-1], &xyzfil1.1[..n-1], &xyzfil1.2[..n-1]);
+        let xyzobs = (
+            &xyzfil1.0[..n - 1],
+            &xyzfil1.1[..n - 1],
+            &xyzfil1.2[..n - 1],
+        );
         let (x, y, z) = &xyzfil1;
         let dl = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
 
         // Calculate force from circular filaments to helix,
         // using filament direction vector as the current density vector
         // to represent unit current on the linear filaments
-        let out = (&mut x.clone()[..n-1], &mut x.clone()[..n-1], &mut x.clone()[..n-1]);
-        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, out).unwrap();
+        let (outx, outy, outz) = (
+            &mut x.clone()[..n - 1],
+            &mut x.clone()[..n - 1],
+            &mut x.clone()[..n - 1],
+        );
+        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, (outx, outy, outz)).unwrap();
+        let out_sum: (f64, f64, f64) = (outx.iter().sum(), outy.iter().sum(), outz.iter().sum());
 
-        // Calcualte force from helix to circular filaments
+        // Calculate force from helix to circular filaments
+        // by discretizing circular filaments
+        let mut out2_sum = (0.0, 0.0, 0.0);
+        let ndiscr = 100;
+        let xyzfil = (&x[..], &y[..], &z[..]);
+        for i in 0..rfil.len() {
+            let (xi, yi, zi) = discretize_circular_filament(rfil[i], zfil[i], ndiscr);
+            let (outxi, outyi, outzi) = (
+                &mut xi.clone()[..ndiscr - 1],
+                &mut yi.clone()[..ndiscr - 1],
+                &mut zi.clone()[..ndiscr - 1],
+            );
+            let dl2 = (&diff(&xi)[..], &diff(&yi)[..], &diff(&zi)[..]);
+            // Each filament is the same length, so we can broadcast one current value here
+            body_force_density_linear_filament(
+                (xyzfil, rss3(dl.0[0], dl.1[0], dl.2[0])),
+                (&xi[..ndiscr - 1], &yi[..ndiscr - 1], &zi[..ndiscr - 1]),
+                dl2,
+                (outxi, outyi, outzi),
+            )
+            .unwrap();
 
+            out2_sum.0 += nfil[i] * outxi.iter().sum::<f64>();
+            out2_sum.1 += nfil[i] * outyi.iter().sum::<f64>();
+            out2_sum.2 += nfil[i] * outzi.iter().sum::<f64>();
+        }
 
-        panic!()
+        // Equal and opposite reaction
+        assert!(approx(out_sum.0, -out2_sum.0, 5e-2, 1e-9));
+        assert!(approx(out_sum.1, -out2_sum.1, 5e-2, 1e-9));
+        assert!(approx(out_sum.2, -out2_sum.2, 5e-2, 1e-9));
     }
 
     /// Make sure that the cylindrical-to-cartesian conversion produces the
