@@ -102,10 +102,6 @@ fn bench_vector_potential_linear_filament(c: &mut Criterion) {
             let xfil = vec![1.0 / 7.0_f64; nfils];
             let yfil = vec![1.0 / 9.0_f64; nfils];
             let zfil = vec![1.0 / 11.0_f64; nfils];
-            let dlxfil = vec![1.0 / 1.3_f64; nfils];
-            let dlyfil = vec![1.0 / 2.3_f64; nfils];
-            let dlzfil = vec![1.0 / 3.3_f64; nfils];
-            let ifil = vec![0.5_f64; nfils];
 
             // Observation points
             let nobs = 1000;
@@ -131,10 +127,8 @@ fn bench_vector_potential_linear_filament(c: &mut Criterion) {
                         let (mut bx, mut by, mut bz) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
                         black_box(
                             vector_potential_linear_filament(
+                                ((&xfil[..], &yfil[..], &zfil[..]), 1.1),
                                 (&xobs[..], &yobs[..], &zobs[..]),
-                                (&xfil[..], &yfil[..], &zfil[..]),
-                                (&dlxfil[..], &dlyfil[..], &dlzfil[..]),
-                                &ifil[..],
                                 (&mut bx, &mut by, &mut bz),
                             )
                             .unwrap(),
@@ -157,10 +151,8 @@ fn bench_vector_potential_linear_filament(c: &mut Criterion) {
                         let (mut bx, mut by, mut bz) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
                         black_box(
                             vector_potential_linear_filament_par(
+                                ((&xfil[..], &yfil[..], &zfil[..]), 1.1),
                                 (&xobs[..], &yobs[..], &zobs[..]),
-                                (&xfil[..], &yfil[..], &zfil[..]),
-                                (&dlxfil[..], &dlyfil[..], &dlzfil[..]),
-                                &ifil[..],
                                 (&mut bx, &mut by, &mut bz),
                             )
                             .unwrap(),

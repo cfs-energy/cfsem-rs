@@ -288,22 +288,18 @@ pub fn flux_density_linear_filament(
     Ok(())
 }
 
-/// Vector potential calculation for A-field contribution from many current filament
-/// segments to many observation points. This variant of the function is
-/// parallelized over chunks of observation points.
+/// Vector potential (A-field) from many linear current
+/// filament segments to many observation points.
+/// This variant of the function is parallelized over chunks of observation points.
 ///
 /// # Arguments
 ///
-/// * `xyzp`:     (m) Observation point coords, each length `n`
-/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
-/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
-/// * `ifil`:     (A) Filament current, length `m`
-/// * `out`:      (V-s/m) ax, ay, az at observation points, each length `n`
+/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
+/// * `xyzobs`:   (m, A) Observation point coords, each length `n`
+/// * `out`:      (V-s/m) vector potential, each length `n`
 pub fn vector_potential_linear_filament_par(
-    xyzp: (&[f64], &[f64], &[f64]),
-    xyzfil: (&[f64], &[f64], &[f64]),
-    dlxyzfil: (&[f64], &[f64], &[f64]),
-    ifil: &[f64],
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzobs: (&[f64], &[f64], &[f64]),
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
@@ -311,11 +307,11 @@ pub fn vector_potential_linear_filament_par(
         .unwrap_or(NonZeroUsize::MIN)
         .get();
 
-    let n = (xyzp.0.len() / ncores).max(1);
+    let n = (xyzobs.0.len() / ncores).max(1);
 
-    let xpc = xyzp.0.par_chunks(n);
-    let ypc = xyzp.1.par_chunks(n);
-    let zpc = xyzp.2.par_chunks(n);
+    let xpc = xyzobs.0.par_chunks(n);
+    let ypc = xyzobs.1.par_chunks(n);
+    let zpc = xyzobs.2.par_chunks(n);
 
     let bxc = out.0.par_chunks_mut(n);
     let byc = out.1.par_chunks_mut(n);
@@ -324,33 +320,28 @@ pub fn vector_potential_linear_filament_par(
     // Run calcs
     bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
         .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
-            vector_potential_linear_filament((xp, yp, zp), xyzfil, dlxyzfil, ifil, (bx, by, bz))
+            vector_potential_linear_filament(xyzifil, (xp, yp, zp), (bx, by, bz))
         })?;
 
     Ok(())
 }
 
-/// Vector potential calculation for A-field contribution from many current filament
-/// segments to many observation points.
+/// Vector potential (A-field) from many linear current
+/// filament segments to many observation points.
 ///
 /// # Arguments
 ///
-/// * `xyzp`:     (m) Observation point coords, each length `n`
-/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
-/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
-/// * `ifil`:     (A) Filament current, length `m`
-/// * `out`:      (V-s/m) ax, ay, az at observation points, each length `n`
+/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
+/// * `xyzobs`:   (m, A) Observation point coords, each length `n`
+/// * `out`:      (V-s/m) vector potential, each length `n`
 pub fn vector_potential_linear_filament(
-    xyzp: (&[f64], &[f64], &[f64]),
-    xyzfil: (&[f64], &[f64], &[f64]),
-    dlxyzfil: (&[f64], &[f64], &[f64]),
-    ifil: &[f64],
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzobs: (&[f64], &[f64], &[f64]),
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Unpack
-    let (xp, yp, zp) = xyzp;
-    let (xfil, yfil, zfil) = xyzfil;
-    let (dlxfil, dlyfil, dlzfil) = dlxyzfil;
+    let (xp, yp, zp) = xyzobs;
+    let ((xfil, yfil, zfil), ifil) = xyzifil;
 
     let (ax, ay, az) = out;
 
@@ -362,57 +353,83 @@ pub fn vector_potential_linear_filament(
     if xp.len() != m
         || yp.len() != m
         || zp.len() != m
+        || ax.len() != m
+        || ay.len() != m
+        || az.len() != m
         || xfil.len() != n
         || yfil.len() != n
         || zfil.len() != n
-        || dlxfil.len() != n
-        || dlyfil.len() != n
-        || dlzfil.len() != n
-        || ifil.len() != n
     {
         return Err("Input length mismatch");
     }
 
+    // Zero output
     ax.fill(0.0);
     ay.fill(0.0);
     az.fill(0.0);
 
     // For each filament, evaluate the contribution to each observation point
-    for i in 0..n {
-        // Get filament midpoint
-        let dlxi = dlxfil[i]; // [m]
-        let dlyi = dlyfil[i]; // [m]
-        let dlzi = dlzfil[i]; // [m]
-        let xmid = dlxi.mul_add(0.5, xfil[i]); // [m]
-        let ymid = dlyi.mul_add(0.5, yfil[i]); // [m]
-        let zmid = dlzi.mul_add(0.5, zfil[i]); // [m]
-        let current = ifil[i];
-
+    for i in 0..n - 1 {
         for j in 0..m {
-            // Get distance from middle of the filament segment to the observation point
-            let rx = xp[j] - xmid; // [m]
-            let ry = yp[j] - ymid; // [m]
-            let rz = zp[j] - zmid; // [m]
-            let rnorm = rss3(rx, ry, rz); // [m]
+            // The inner function is inlined, so values that are reused between iterations
+            // can be pulled to the outer scope by the compiler and do not affect performance
 
-            let c = current / rnorm;
+            // Geometry
+            let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] this filament start
+            let fil1 = (xfil[i + 1], yfil[i + 1], zfil[i + 1]); // [m] this filament end
+            let obs = (xp[j], yp[j], zp[j]); // [m] this observation point
 
-            // The contributions added here have units of amperes,
-            // but the sum will have units of volt second per meter after being multiplied
-            // by mu_0 / (4 * pi) below.
-            ax[j] = c.mul_add(dlxi, ax[j]);
-            ay[j] = c.mul_add(dlyi, ay[j]);
-            az[j] = c.mul_add(dlzi, az[j])
+            // [V-s/m] vector potential contribution of this filament to this observation point
+            let (axc, ayc, azc) = vector_potential_linear_filament_scalar((fil0, fil1, ifil), obs);
+            ax[j] += axc;
+            ay[j] += ayc;
+            az[j] += azc;
         }
     }
 
-    for j in 0..m {
-        ax[j] *= MU0_OVER_4PI;
-        ay[j] *= MU0_OVER_4PI;
-        az[j] *= MU0_OVER_4PI;
-    }
-
     Ok(())
+}
+
+/// Vector potential (A-field) from a linear current
+/// filament segment to an observation point.
+///
+/// # Arguments
+///
+/// * `xyzfil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzp`:     (m) Observation point coords
+///
+/// # Returns
+///
+/// * `a`:        (V-s/m) Vector potential
+#[inline]
+pub fn vector_potential_linear_filament_scalar(
+    xyzifil: ((f64, f64, f64), (f64, f64, f64), f64),
+    xyzobs: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    // Unpack
+    let (xyz0, xyz1, ifil) = xyzifil;
+
+    // Evaluate
+    let dl = (xyz1.0 - xyz0.0, xyz1.1 - xyz0.1, xyz1.2 - xyz0.2); // [m] filament vector
+    let (xmid, ymid, zmid) = (
+        xyz0.0 + dl.0 / 2.0,
+        xyz0.1 + dl.1 / 2.0,
+        xyz0.2 + dl.2 / 2.0,
+    ); // [m] filament midpoint
+
+    let (rx, ry, rz) = (xyzobs.0 - xmid, xyzobs.1 - ymid, xyzobs.2 - zmid); // [m] vector from filament midpoint to obs point
+    let rnorm = rss3(rx, ry, rz);
+
+    // Scale factor shared between all components of A
+    let c = MU0_OVER_4PI * (ifil / rnorm);
+
+    // Vector potential is linear in the current and segment length
+    // and goes like 1/R from the segment to the observation point.
+    let ax = c * dl.0;
+    let ay = c * dl.1;
+    let az = c * dl.2;
+
+    (ax, ay, az)
 }
 
 #[cfg(test)]
@@ -432,7 +449,7 @@ mod test {
     #[test]
     fn test_vector_potential() {
         // One super basic filament as the source
-        let xyz = [0.0];
+        let xyz = [0.0, 1.0];
         let dlxyz = [1.0];
 
         // Build a second scattering of filament locations as the target
@@ -474,10 +491,8 @@ mod test {
         let outy = &mut [0.0; NFIL - 1];
         let outz = &mut [0.0; NFIL - 1];
         vector_potential_linear_filament(
+            ((&xyz, &xyz, &xyz), 1.0),
             (&xmid2, &ymid2, &zmid2),
-            (&xyz, &xyz, &xyz),
-            (&dlxyz, &dlxyz, &dlxyz),
-            &[1.0],
             (outx, outy, outz),
         )
         .unwrap();
@@ -493,7 +508,7 @@ mod test {
             .collect();
         let m_from_a = a_dot_dl.iter().sum();
         let m = inductance_piecewise_linear_filaments(
-            (&xyz, &xyz, &xyz),
+            (&xyz[0..1], &xyz[0..1], &xyz[0..1]),
             (&dlxyz, &dlxyz, &dlxyz),
             xyzfil2,
             dlxyzfil2,
@@ -508,10 +523,8 @@ mod test {
             let mut outz = [0.0];
 
             vector_potential_linear_filament(
+                ((&xyz, &xyz, &xyz), 1.0),
                 (&[x], &[y], &[z]),
-                (&xyz, &xyz, &xyz),
-                (&dlxyz, &dlxyz, &dlxyz),
-                &[1.0],
                 (&mut outx, &mut outy, &mut outz),
             )
             .unwrap();
@@ -574,7 +587,7 @@ mod test {
                     let mut bz = [0.0];
                     flux_density_linear_filament(
                         (&[*x], &[*y], &[*z]),
-                        (&xyz, &xyz, &xyz),
+                        (&xyz[0..1], &xyz[0..1], &xyz[0..1]),
                         (&dlxyz, &dlxyz, &dlxyz),
                         &[1.0],
                         (&mut bx, &mut by, &mut bz),
@@ -597,19 +610,19 @@ mod test {
         const NOBS: usize = 100;
 
         // Build a scattering of filament locations
+        let ifil = 1.718 / 2.0_f64;
         let xfil: Vec<f64> = (0..NFIL).map(|i| (i as f64).sin()).collect();
         let yfil: Vec<f64> = (0..NFIL).map(|i| (i as f64).cos()).collect();
         let zfil: Vec<f64> = (0..NFIL)
             .map(|i| (i as f64) - (NFIL as f64) / 2.0)
             .collect();
         let xyzfil = (&xfil[..=NFIL - 2], &yfil[..=NFIL - 2], &zfil[..=NFIL - 2]);
+        let xyzifil = ((&xfil[..], &yfil[..], &zfil[..]), ifil);
 
         let dlxfil: Vec<f64> = (0..=NFIL - 2).map(|i| xfil[i + 1] - xfil[i]).collect();
         let dlyfil: Vec<f64> = (0..=NFIL - 2).map(|i| yfil[i + 1] - yfil[i]).collect();
         let dlzfil: Vec<f64> = (0..=NFIL - 2).map(|i| zfil[i + 1] - zfil[i]).collect();
         let dlxyzfil = (&dlxfil[..], &dlyfil[..], &dlzfil[..]);
-
-        let ifil: &[f64] = &(0..NFIL - 1).map(|i| (i as f64)).collect::<Vec<f64>>()[..];
 
         // Build a scattering of observation locations
         let xp: Vec<f64> = (0..NOBS).map(|i| 2.0 * (i as f64).sin() + 2.1).collect();
@@ -627,8 +640,9 @@ mod test {
         let out5 = &mut [5.0; NOBS];
 
         // Flux density
-        flux_density_linear_filament(xyzp, xyzfil, dlxyzfil, ifil, (out0, out1, out2)).unwrap();
-        flux_density_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil, (out3, out4, out5)).unwrap();
+        let ifil_vec = &xyzfil.0[..];
+        flux_density_linear_filament(xyzp, xyzfil, dlxyzfil, ifil_vec, (out0, out1, out2)).unwrap();
+        flux_density_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil_vec, (out3, out4, out5)).unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out3[i]);
             assert_eq!(out1[i], out4[i]);
@@ -644,8 +658,8 @@ mod test {
         let out5 = &mut [5.0; NOBS];
 
         // Vector potential
-        vector_potential_linear_filament(xyzp, xyzfil, dlxyzfil, ifil, (out0, out1, out2)).unwrap();
-        vector_potential_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil, (out3, out4, out5))
+        vector_potential_linear_filament(xyzifil, xyzp, (out0, out1, out2)).unwrap();
+        vector_potential_linear_filament_par(xyzifil, xyzp, (out3, out4, out5))
             .unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out3[i]);
