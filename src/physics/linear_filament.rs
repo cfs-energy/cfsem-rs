@@ -405,7 +405,7 @@ pub fn vector_potential_linear_filament(
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
-/// * `xyzp`:     (m) Observation point coords
+/// * `xyzobs`:     (m) Observation point coords
 ///
 /// # Returns
 ///
@@ -435,6 +435,29 @@ pub fn vector_potential_linear_filament_scalar(
     let az = c * dl.2;
 
     (ax, ay, az)
+}
+
+/// JxB (Lorentz) body force density (per volume) due to a linear current
+/// filament segment at an observation point with some current density (per area).
+///
+/// # Arguments
+///
+/// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzobs`:    (m) Observation point coords
+/// * `jobs`:      (A/m^2) Current density vector at observation point
+///
+/// # Returns
+///
+/// * `jxb`:        (N/m^3) Body force density
+pub fn body_force_density_linear_filament_scalar(
+    xyzifil: ((f64, f64, f64), (f64, f64, f64), f64),
+    xyzobs: (f64, f64, f64),
+    jobs: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    // Get magnetic flux density at target point
+    let (bx, by, bz) = flux_density_linear_filament_scalar(xyzifil, xyzobs); // [T]
+    // Take JxB Lorentz force
+    cross3(jobs.0, jobs.1, jobs.2, bx, by, bz)
 }
 
 #[cfg(test)]
