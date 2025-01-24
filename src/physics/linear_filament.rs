@@ -322,14 +322,15 @@ pub fn vector_potential_linear_filament_par(
     let ypc = xyzobs.1.par_chunks(n);
     let zpc = xyzobs.2.par_chunks(n);
 
-    let bxc = out.0.par_chunks_mut(n);
-    let byc = out.1.par_chunks_mut(n);
-    let bzc = out.2.par_chunks_mut(n);
+    let outxc = out.0.par_chunks_mut(n);
+    let outyc = out.1.par_chunks_mut(n);
+    let outzc = out.2.par_chunks_mut(n);
 
     // Run calcs
-    bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
-        .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
-            vector_potential_linear_filament(xyzifil, (xp, yp, zp), (bx, by, bz))
+    outxc
+        .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc)))))
+        .try_for_each(|(outx, (outy, (outz, (xp, (yp, zp)))))| {
+            vector_potential_linear_filament(xyzifil, (xp, yp, zp), (outx, outy, outz))
         })?;
 
     Ok(())
@@ -456,8 +457,136 @@ pub fn body_force_density_linear_filament_scalar(
 ) -> (f64, f64, f64) {
     // Get magnetic flux density at target point
     let (bx, by, bz) = flux_density_linear_filament_scalar(xyzifil, xyzobs); // [T]
-    // Take JxB Lorentz force
+                                                                             // Take JxB Lorentz force
     cross3(jobs.0, jobs.1, jobs.2, bx, by, bz)
+}
+
+/// JxB (Lorentz) body force density (per volume) due to a linear current
+/// filament segment at an observation point with some current density (per area).
+///
+/// # Arguments
+///
+/// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzobs`:    (m) Observation point coords
+/// * `jobs`:      (A/m^2) Current density vector at observation point
+///
+/// # Returns
+///
+/// * `jxb`:        (N/m^3) Body force density
+pub fn body_force_density_linear_filament(
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    jobs: (&[f64], &[f64], &[f64]),
+    out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Unpack
+    let (xp, yp, zp) = xyzobs;
+    let (jx, jy, jz) = jobs;
+    let ((xfil, yfil, zfil), ifil) = xyzifil;
+
+    let (outx, outy, outz) = out;
+
+    // Check lengths; if there is any possibility of mismatch,
+    // the compiler will bypass vectorization
+    let n = xfil.len();
+    let m = xp.len();
+
+    if xp.len() != m
+        || yp.len() != m
+        || zp.len() != m
+        || jx.len() != m
+        || jy.len() != m
+        || jz.len() != m
+        || outx.len() != m
+        || outy.len() != m
+        || outz.len() != m
+        || xfil.len() != n
+        || yfil.len() != n
+        || zfil.len() != n
+    {
+        return Err("Input length mismatch");
+    }
+
+    // Zero output
+    outx.fill(0.0);
+    outy.fill(0.0);
+    outz.fill(0.0);
+
+    // For each filament, evaluate the contribution to each observation point
+    for i in 0..n - 1 {
+        for j in 0..m {
+            // The inner function is inlined, so values that are reused between iterations
+            // can be pulled to the outer scope by the compiler and do not affect performance
+
+            // Geometry
+            let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] this filament start
+            let fil1 = (xfil[i + 1], yfil[i + 1], zfil[i + 1]); // [m] this filament end
+            let obs = (xp[j], yp[j], zp[j]); // [m] this observation point
+            let jj = (jx[j], jy[j], jz[j]); // [A/m^2] current density vector at obs point
+
+            // [V-s/m] vector potential contribution of this filament to this observation point
+            let (jxbx, jxby, jxbz) =
+                body_force_density_linear_filament_scalar((fil0, fil1, ifil), obs, jj);
+            outx[j] += jxbx;
+            outy[j] += jxby;
+            outz[j] += jxbz;
+        }
+    }
+
+    Ok(())
+}
+
+/// JxB (Lorentz) body force density (per volume) due to a linear current
+/// filament segment at an observation point with some current density (per area).
+/// This variant is parallelized over chunks of observation points.
+///
+/// # Arguments
+///
+/// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzobs`:    (m) Observation point coords
+/// * `jobs`:      (A/m^2) Current density vector at observation point
+///
+/// # Returns
+///
+/// * `jxb`:        (N/m^3) Body force density
+pub fn body_force_density_linear_filament_par(
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    jobs: (&[f64], &[f64], &[f64]),
+    out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Chunk inputs
+    let ncores = std::thread::available_parallelism()
+        .unwrap_or(NonZeroUsize::MIN)
+        .get();
+
+    let n = (xyzobs.0.len() / ncores).max(1);
+
+    let xpc = xyzobs.0.par_chunks(n);
+    let ypc = xyzobs.1.par_chunks(n);
+    let zpc = xyzobs.2.par_chunks(n);
+
+    let jxc = jobs.0.par_chunks(n);
+    let jyc = jobs.1.par_chunks(n);
+    let jzc = jobs.2.par_chunks(n);
+
+    let outxc = out.0.par_chunks_mut(n);
+    let outyc = out.1.par_chunks_mut(n);
+    let outzc = out.2.par_chunks_mut(n);
+
+    // Run calcs
+    outxc
+        .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc.zip(jxc.zip(jyc.zip(jzc))))))))
+        .try_for_each(|(outx, (outy, (outz, (xp, (yp, (zp, (jx, (jy, jz))))))))| {
+            body_force_density_linear_filament(
+                xyzifil,
+                (xp, yp, zp),
+                (jx, jy, jz),
+                (outx, outy, outz),
+            )
+        })?;
+
+    Ok(())
 }
 
 #[cfg(test)]
