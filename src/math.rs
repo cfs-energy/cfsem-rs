@@ -120,3 +120,20 @@ pub fn cylindrical_to_cartesian(r: f64, phi: f64, z: f64) -> (f64, f64, f64) {
     let y = r * libm::sin(phi);
     (x, y, z)
 }
+
+/// Decompose two filament endpoints into a midpoint and a length vector
+#[inline]
+pub fn decompose_filament(
+    start: (f64, f64, f64),
+    end: (f64, f64, f64),
+) -> ((f64, f64, f64), (f64, f64, f64)) {
+    // Evaluate
+    let dl = (end.0 - start.0, end.1 - start.1, end.2 - start.2); // [m] filament vector
+    let midpoint = (
+        dl.0.mul_add(0.5, start.0),
+        dl.1.mul_add(0.5, start.1),
+        dl.2.mul_add(0.5, start.2),
+    ); // [m] filament midpoint
+
+    (midpoint, dl)
+}

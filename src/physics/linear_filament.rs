@@ -6,7 +6,7 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{cross3, dot3, rss3};
+use crate::math::{cross3, decompose_filament, dot3, rss3};
 use crate::MU0_OVER_4PI;
 
 /// Estimate the mutual inductance between two piecewise-linear current filaments.
@@ -152,16 +152,12 @@ pub fn inductance_piecewise_linear_filaments(
 ///
 /// # Arguments
 ///
-/// * `xyzp`:     (m) Observation point coords, each length `n`
-/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
-/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
-/// * `ifil`:     (A) Filament current, length `m`
-/// * `out`:      (T) bx, by, bz at observation points, each length `n`
+/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
+/// * `xyzobs`:   (m, A) Observation point coords, each length `n` with scalar current
+/// * `out`:      (T) B-field at observation points, each length `n`
 pub fn flux_density_linear_filament_par(
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
     xyzp: (&[f64], &[f64], &[f64]),
-    xyzfil: (&[f64], &[f64], &[f64]),
-    dlxyzfil: (&[f64], &[f64], &[f64]),
-    ifil: &[f64],
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
@@ -182,7 +178,7 @@ pub fn flux_density_linear_filament_par(
     // Run calcs
     bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
         .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
-            flux_density_linear_filament((xp, yp, zp), xyzfil, dlxyzfil, ifil, (bx, by, bz))
+            flux_density_linear_filament(xyzifil, (xp, yp, zp), (bx, by, bz))
         })?;
 
     Ok(())
@@ -193,22 +189,17 @@ pub fn flux_density_linear_filament_par(
 ///
 /// # Arguments
 ///
-/// * `xyzp`:     (m) Observation point coords, each length `n`
-/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
-/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
-/// * `ifil`:     (A) Filament current, length `m`
-/// * `out`:      (T) bx, by, bz at observation points, each length `n`
+/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
+/// * `xyzobs`:   (m, A) Observation point coords, each length `n` with scalar current
+/// * `out`:      (T) B-field at observation points, each length `n`
 pub fn flux_density_linear_filament(
+    xyzifil: ((&[f64], &[f64], &[f64]), f64),
     xyzp: (&[f64], &[f64], &[f64]),
-    xyzfil: (&[f64], &[f64], &[f64]),
-    dlxyzfil: (&[f64], &[f64], &[f64]),
-    ifil: &[f64],
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Unpack
     let (xp, yp, zp) = xyzp;
-    let (xfil, yfil, zfil) = xyzfil;
-    let (dlxfil, dlyfil, dlzfil) = dlxyzfil;
+    let ((xfil, yfil, zfil), ifil) = xyzifil;
 
     let (bx, by, bz) = out;
 
@@ -220,13 +211,12 @@ pub fn flux_density_linear_filament(
     if xp.len() != m
         || yp.len() != m
         || zp.len() != m
+        || bx.len() != m
+        || by.len() != m
+        || bz.len() != m
         || xfil.len() != n
         || yfil.len() != n
         || zfil.len() != n
-        || dlxfil.len() != n
-        || dlyfil.len() != n
-        || dlzfil.len() != n
-        || ifil.len() != n
     {
         return Err("Input length mismatch");
     }
@@ -237,55 +227,74 @@ pub fn flux_density_linear_filament(
     bz.fill(0.0);
 
     // For each filament, evaluate the contribution to each observation point
-    for i in 0..n {
-        // Get filament midpoint
-        let dlxi = dlxfil[i]; // [m]
-        let dlyi = dlyfil[i]; // [m]
-        let dlzi = dlzfil[i]; // [m]
-        let xmid = dlxi.mul_add(0.5, xfil[i]); // [m]
-        let ymid = dlyi.mul_add(0.5, yfil[i]); // [m]
-        let zmid = dlzi.mul_add(0.5, zfil[i]); // [m]
-
-        // Get filament current and bake in the constant factor
-        let current = ifil[i];
-
+    for i in 0..n - 1 {
         for j in 0..m {
-            // Get distance from middle of the filament segment to the observation point
-            let rx = xp[j] - xmid; // [m]
-            let ry = yp[j] - ymid; // [m]
-            let rz = zp[j] - zmid; // [m]
+            // The inner function is inlined, so values that are reused between iterations
+            // can be pulled to the outer scope by the compiler and do not affect performance
 
-            // Do 1/r^3 operation with an ordering that improves float error by eliminating
-            // the actual cube operation and using fused multiply-add to reduce roundoff events,
-            // then rolling the result into the factor that is constant between all contributions.
-            let sumsq = dot3(rx, ry, rz, rx, ry, rz);
-            let rnorm3_inv = sumsq.powf(-1.5); // [m^-3]
+            // Geometry
+            let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] this filament start
+            let fil1 = (xfil[i + 1], yfil[i + 1], zfil[i + 1]); // [m] this filament end
+            let obs = (xp[j], yp[j], zp[j]); // [m] this observation point
 
-            // This factor is constant across all x, y, and z components
-            let c = current * rnorm3_inv;
-
-            // Evaluate the cross products for each axis component
-            // separately using mul_add which would not be assumed usable
-            // in a more general implementation.
-            let (cx, cy, cz) = cross3(dlxi, dlyi, dlzi, rx, ry, rz);
-
-            // Sum up the contributions at each observation point on each axis
-            // using fused multiply-add again to reduce roundoff error and slightly improve speed
-            // The B-field contributions added here *do not* have units of tesla,
-            // but the sum will have units of tesla after it is multiplied by mu_0 / (4 * pi) below.
-            bx[j] = c.mul_add(cx, bx[j]);
-            by[j] = c.mul_add(cy, by[j]);
-            bz[j] = c.mul_add(cz, bz[j]);
+            // [T] flux density contribution of this filament to this observation point
+            let (bxc, byc, bzc) = flux_density_linear_filament_scalar((fil0, fil1, ifil), obs);
+            bx[j] += bxc;
+            by[j] += byc;
+            bz[j] += bzc;
         }
     }
 
-    for j in 0..m {
-        bx[j] *= MU0_OVER_4PI;
-        by[j] *= MU0_OVER_4PI;
-        bz[j] *= MU0_OVER_4PI;
-    }
-
     Ok(())
+}
+
+/// Biot-Savart calculation for B-field contribution from many current filament
+/// segments to many observation points.
+///
+/// # Arguments
+///
+/// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzp`:     (m) Observation point coords
+///
+/// # Returns
+///
+/// * `b`:        (T) Magnetic flux density (B-field)
+pub fn flux_density_linear_filament_scalar(
+    xyzifil: ((f64, f64, f64), (f64, f64, f64), f64),
+    xyzobs: (f64, f64, f64),
+) -> (f64, f64, f64) {
+    // Unpack
+    let (xyz0, xyz1, ifil) = xyzifil;
+    let (xp, yp, zp) = xyzobs;
+
+    // Get filament midpoint and length vector
+    let ((xmid, ymid, zmid), dl) = decompose_filament(xyz0, xyz1);
+
+    // Get distance from middle of the filament segment to the observation point
+    let rx = xp - xmid; // [m]
+    let ry = yp - ymid; // [m]
+    let rz = zp - zmid; // [m]
+
+    // Do 1/r^3 operation with an ordering that improves float error by eliminating
+    // the actual cube operation and using fused multiply-add to reduce roundoff events,
+    // then rolling the result into the factor that is constant between all contributions.
+    let sumsq = dot3(rx, ry, rz, rx, ry, rz);
+    let rnorm3_inv = sumsq.powf(-1.5); // [m^-3]
+
+    // This factor is constant across all x, y, and z components
+    let c = MU0_OVER_4PI * ifil * rnorm3_inv;
+
+    // Evaluate the cross products for each axis component
+    // separately using mul_add which would not be assumed usable
+    // in a more general implementation.
+    let (cx, cy, cz) = cross3(dl.0, dl.1, dl.2, rx, ry, rz);
+
+    // Assemble final B-field components
+    let bx = c * cx; // [T]
+    let by = c * cy;
+    let bz = c * cz;
+
+    (bx, by, bz)
 }
 
 /// Vector potential (A-field) from many linear current
@@ -395,7 +404,7 @@ pub fn vector_potential_linear_filament(
 ///
 /// # Arguments
 ///
-/// * `xyzfil`:   (m, m, A) Filament start and end coords and current
+/// * `xyzifil`:   (m, m, A) Filament start and end coords and current
 /// * `xyzp`:     (m) Observation point coords
 ///
 /// # Returns
@@ -409,13 +418,8 @@ pub fn vector_potential_linear_filament_scalar(
     // Unpack
     let (xyz0, xyz1, ifil) = xyzifil;
 
-    // Evaluate
-    let dl = (xyz1.0 - xyz0.0, xyz1.1 - xyz0.1, xyz1.2 - xyz0.2); // [m] filament vector
-    let (xmid, ymid, zmid) = (
-        dl.0.mul_add(0.5, xyz0.0),
-        dl.1.mul_add(0.5, xyz0.1),
-        dl.2.mul_add(0.5, xyz0.2),
-    ); // [m] filament midpoint
+    // Get filament midpoint and length vector
+    let ((xmid, ymid, zmid), dl) = decompose_filament(xyz0, xyz1);
 
     // [m] vector from filament midpoint to obs point
     let (rx, ry, rz) = (xyzobs.0 - xmid, xyzobs.1 - ymid, xyzobs.2 - zmid);
@@ -587,10 +591,8 @@ mod test {
                     let mut by = [0.0];
                     let mut bz = [0.0];
                     flux_density_linear_filament(
+                        ((&xyz, &xyz, &xyz), 1.0),
                         (&[*x], &[*y], &[*z]),
-                        (&xyz[0..1], &xyz[0..1], &xyz[0..1]),
-                        (&dlxyz, &dlxyz, &dlxyz),
-                        &[1.0],
                         (&mut bx, &mut by, &mut bz),
                     )
                     .unwrap();
@@ -617,13 +619,7 @@ mod test {
         let zfil: Vec<f64> = (0..NFIL)
             .map(|i| (i as f64) - (NFIL as f64) / 2.0)
             .collect();
-        let xyzfil = (&xfil[..=NFIL - 2], &yfil[..=NFIL - 2], &zfil[..=NFIL - 2]);
         let xyzifil = ((&xfil[..], &yfil[..], &zfil[..]), ifil);
-
-        let dlxfil: Vec<f64> = (0..=NFIL - 2).map(|i| xfil[i + 1] - xfil[i]).collect();
-        let dlyfil: Vec<f64> = (0..=NFIL - 2).map(|i| yfil[i + 1] - yfil[i]).collect();
-        let dlzfil: Vec<f64> = (0..=NFIL - 2).map(|i| zfil[i + 1] - zfil[i]).collect();
-        let dlxyzfil = (&dlxfil[..], &dlyfil[..], &dlzfil[..]);
 
         // Build a scattering of observation locations
         let xp: Vec<f64> = (0..NOBS).map(|i| 2.0 * (i as f64).sin() + 2.1).collect();
@@ -641,10 +637,8 @@ mod test {
         let out5 = &mut [5.0; NOBS];
 
         // Flux density
-        let ifil_vec = &xyzfil.0[..];
-        flux_density_linear_filament(xyzp, xyzfil, dlxyzfil, ifil_vec, (out0, out1, out2)).unwrap();
-        flux_density_linear_filament_par(xyzp, xyzfil, dlxyzfil, ifil_vec, (out3, out4, out5))
-            .unwrap();
+        flux_density_linear_filament(xyzifil, xyzp, (out0, out1, out2)).unwrap();
+        flux_density_linear_filament_par(xyzifil, xyzp, (out3, out4, out5)).unwrap();
         for i in 0..NOBS {
             assert_eq!(out0[i], out3[i]);
             assert_eq!(out1[i], out4[i]);

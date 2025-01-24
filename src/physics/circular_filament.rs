@@ -941,26 +941,15 @@ mod test {
             let ndiscr = 400;
             let xyzfil0 = discretize_circular_filament(r, z, ndiscr);
             let xyzfil0 = (&xyzfil0.0[..], &xyzfil0.1[..], &xyzfil0.2[..]);
-            let dlxyzfil0 = (
-                &diff(xyzfil0.0)[..],
-                &diff(xyzfil0.1)[..],
-                &diff(xyzfil0.2)[..],
-            );
-            let ifil = &mut xyzfil0.0.to_vec()[..ndiscr - 1]; // Use number of turns for this circular fil as filament current
-            ifil.fill(nturns);
+
+            let ifil = 1.0;
             let (xcontrib, ycontrib, zcontrib) =
                 (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
 
             // Do calc
             crate::physics::linear_filament::flux_density_linear_filament_par(
+                (xyzfil0, ifil * nturns),
                 xyzobs,
-                (
-                    &xyzfil0.0[..ndiscr - 1],
-                    &xyzfil0.1[..ndiscr - 1],
-                    &xyzfil0.2[..ndiscr - 1],
-                ),
-                dlxyzfil0,
-                ifil,
                 (xcontrib, ycontrib, zcontrib),
             )
             .unwrap();
