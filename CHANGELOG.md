@@ -14,7 +14,7 @@
 * Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
 * Add `decompose_filament` function for converting the start and end points of a filament to the midpoint and length vector
-* Add `body_force_density_linear_filament` family of functions for calculating JxB force density due to a linear filament
+* Add `body_force_density_linear_filament` and `body_force_density_circular_filament_cartesian` families of functions for calculating JxB force density
 
 ### Changed
 

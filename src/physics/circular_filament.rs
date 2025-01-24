@@ -800,6 +800,123 @@ pub fn body_force_density_circular_filament_cartesian_scalar(
     cross3(jobs.0, jobs.1, jobs.2, bx, by, bz) // [N/m^3]
 }
 
+/// JxB (Lorentz) body force density (per volume) in cartesian form due to a circular current
+/// filament segment at an observation point in cartesian form with some current density (per area).
+///
+/// # Arguments
+///
+/// * `rzifil`:    (m, m, A-turns) r-coord, z-coord, and current of filament, each length `m`
+/// * `xyzobs`:    (m) Observation point coords, each length `n`
+/// * `jobs`:      (A/m^2) Current density vector at observation point, each length `n`
+///
+/// # Returns
+///
+/// * `jxb`:        (N/m^3) Body force density in cartesian form
+pub fn body_force_density_circular_filament_cartesian(
+    rzifil: (&[f64], &[f64], &[f64]),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    jobs: (&[f64], &[f64], &[f64]),
+    out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Unpack
+    let (rfil, zfil, ifil) = rzifil;
+    let (x, y, z) = xyzobs;
+    let (jx, jy, jz) = jobs;
+    let (outx, outy, outz) = out;
+
+    // Check lengths
+    let n = ifil.len();
+    if rfil.len() != n || zfil.len() != n {
+        return Err("Length mismatch");
+    }
+
+    let m = x.len();
+    if y.len() != m
+        || z.len() != m
+        || jx.len() != m
+        || jy.len() != m
+        || jz.len() != m
+        || outx.len() != m
+        || outy.len() != m
+        || outz.len() != m
+    {
+        return Err("Length mismatch");
+    }
+
+    // Zero output
+    outx.fill(0.0);
+    outy.fill(0.0);
+    outz.fill(0.0);
+
+    // Do calcs
+    for j in 0..m {
+        for i in 0..n {
+            // The inner function is inlined, so values that are reused between iterations
+            // can be pulled to the outer scope by the compiler and do not affect performance
+            let rzifil_i = (rfil[i], zfil[i], ifil[i]);
+            let xyzobs_j = (x[j], y[j], z[j]);
+            let jj = (jx[j], jy[j], jz[j]);
+            let (jxbx, jxby, jxbz) =
+                body_force_density_circular_filament_cartesian_scalar(rzifil_i, xyzobs_j, jj);
+            outx[j] += jxbx;
+            outy[j] += jxby;
+            outz[j] += jxbz;
+        }
+    }
+
+    Ok(())
+}
+
+/// JxB (Lorentz) body force density (per volume) in cartesian form due to a circular current
+/// filament segment at an observation point in cartesian form with some current density (per area).
+/// This variant is parallelized over chunks of observation points.
+///
+/// # Arguments
+///
+/// * `rzifil`:    (m, m, A-turns) r-coord, z-coord, and current of filament, each length `m`
+/// * `xyzobs`:    (m) Observation point coords, each length `n`
+/// * `jobs`:      (A/m^2) Current density vector at observation point, each length `n`
+/// * `out`:        (N/m^3) Body force density in cartesian form, each length `n`
+pub fn body_force_density_circular_filament_cartesian_par(
+    rzifil: (&[f64], &[f64], &[f64]),
+    xyzobs: (&[f64], &[f64], &[f64]),
+    jobs: (&[f64], &[f64], &[f64]),
+    out: (&mut [f64], &mut [f64], &mut [f64]),
+) -> Result<(), &'static str> {
+    // Chunk inputs
+    let ncores = std::thread::available_parallelism()
+        .unwrap_or(NonZeroUsize::MIN)
+        .get();
+
+    let n = (xyzobs.0.len() / ncores).max(1);
+
+    let xpc = xyzobs.0.par_chunks(n);
+    let ypc = xyzobs.1.par_chunks(n);
+    let zpc = xyzobs.2.par_chunks(n);
+
+    let jxc = jobs.0.par_chunks(n);
+    let jyc = jobs.1.par_chunks(n);
+    let jzc = jobs.2.par_chunks(n);
+
+    let outxc = out.0.par_chunks_mut(n);
+    let outyc = out.1.par_chunks_mut(n);
+    let outzc = out.2.par_chunks_mut(n);
+
+    // Run calcs
+    outxc
+        .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc.zip(jxc.zip(jyc.zip(jzc))))))))
+        .try_for_each(|(outx, (outy, (outz, (xp, (yp, (zp, (jx, (jy, jz))))))))| {
+            body_force_density_circular_filament_cartesian(
+                rzifil,
+                (xp, yp, zp),
+                (jx, jy, jz),
+                (outx, outy, outz),
+            )
+        })?;
+
+    Ok(())
+}
+
 pub fn mutual_inductance_circular_to_linear_par(
     rznfil: (&[f64], &[f64], &[f64]),
     xyzfil: (&[f64], &[f64], &[f64]),
