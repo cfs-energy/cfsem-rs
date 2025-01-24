@@ -959,6 +959,36 @@ mod test {
     use super::*;
     use crate::testing::*;
 
+    /// Make sure that force is equal and opposite
+    /// and has the right sign for simple geometries
+    #[test]
+    fn test_body_force_density() {
+
+        // Make some circular filaments
+        let (rfil, zfil, nfil) = example_circular_filaments();
+        // Use number-of-turns as the filament current
+        // so that the result is in per-amp units
+        let rzifil = (&rfil[..], &zfil[..], &nfil[..]);
+
+        // Make a slightly tilted helical piecewise-linear filament
+        let xyzfil1 = example_helix();
+        let n = xyzfil1.0.len();
+        let xyzobs = (&xyzfil1.0[..n-1], &xyzfil1.1[..n-1], &xyzfil1.2[..n-1]);
+        let (x, y, z) = &xyzfil1;
+        let dl = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
+
+        // Calculate force from circular filaments to helix,
+        // using filament direction vector as the current density vector
+        // to represent unit current on the linear filaments
+        let out = (&mut x.clone()[..n-1], &mut x.clone()[..n-1], &mut x.clone()[..n-1]);
+        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, out).unwrap();
+
+        // Calcualte force from helix to circular filaments
+
+
+        panic!()
+    }
+
     /// Make sure that the cylindrical-to-cartesian conversion produces the
     /// same result achieved by discretizing the circular filament into linear
     /// segments, and that the serial and parallel variants produce the same result
