@@ -963,6 +963,13 @@ mod test {
     /// and has the right sign for simple geometries
     #[test]
     fn test_body_force_density() {
+        // Because the force from the circular filament to the lienar filament is calculated
+        // with closed-form circular filament B-field while the force from the linear filament
+        // to the circular filament is calculated by discretizing the circular filament,
+        // tightening tolerances requires excessive discretization of the circular loop,
+        // and some deviation is expected.
+        let (rtol, atol) = (5e-2, 1e-9);
+
         // Make some circular filaments
         let (rfil, zfil, nfil) = example_circular_filaments();
         // Use number-of-turns as the filament current
@@ -1004,10 +1011,11 @@ mod test {
                 &mut zi.clone()[..ndiscr - 1],
             );
             let dl2 = (&diff(&xi)[..], &diff(&yi)[..], &diff(&zi)[..]);
-            // Each filament is the same length, so we can broadcast one current value here
+            // Each filament is the same length, so we can broadcast one current value here.
+            // For second-order accuracy, target filament midpoints are used.
             body_force_density_linear_filament(
-                (xyzfil, rss3(dl.0[0], dl.1[0], dl.2[0])),
-                (&xi[..ndiscr - 1], &yi[..ndiscr - 1], &zi[..ndiscr - 1]),
+                (xyzfil, 1.0),
+                (&midpoints(xi), &midpoints(yi), &midpoints(zi)),
                 dl2,
                 (outxi, outyi, outzi),
             )
@@ -1019,9 +1027,9 @@ mod test {
         }
 
         // Equal and opposite reaction
-        assert!(approx(out_sum.0, -out2_sum.0, 5e-2, 1e-9));
-        assert!(approx(out_sum.1, -out2_sum.1, 5e-2, 1e-9));
-        assert!(approx(out_sum.2, -out2_sum.2, 5e-2, 1e-9));
+        assert!(approx(out_sum.0, -out2_sum.0, rtol, atol));
+        assert!(approx(out_sum.1, -out2_sum.1, rtol, atol));
+        assert!(approx(out_sum.2, -out2_sum.2, rtol, atol));
     }
 
     /// Make sure that the cylindrical-to-cartesian conversion produces the

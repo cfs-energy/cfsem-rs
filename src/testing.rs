@@ -27,7 +27,11 @@ pub(crate) fn diff(v: &[f64]) -> Vec<f64> {
 
 /// Convert circular filament to ndiscr-1 piecewise linear segments
 /// (ndiscr points)
-pub(crate) fn discretize_circular_filament(r: f64, z: f64, ndiscr: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+pub(crate) fn discretize_circular_filament(
+    r: f64,
+    z: f64,
+    ndiscr: usize,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
         .iter()
         .map(|v| r * v.cos())
@@ -78,4 +82,14 @@ pub(crate) fn example_circular_filaments() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let nfil = [PI, E, E / 2.0].to_vec();
 
     (rfil, zfil, nfil)
+}
+
+// Midpoints between each pair of points.
+// Output is 1 index shorter than input.
+pub(crate) fn midpoints(x: Vec<f64>) -> Vec<f64> {
+    x[..]
+        .iter()
+        .zip(x[1..].iter())
+        .map(|(this, next)| (this + next) / 2.0)
+        .collect()
 }
