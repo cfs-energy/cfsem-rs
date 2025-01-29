@@ -597,6 +597,99 @@ mod test {
     use super::*;
     use crate::testing::*;
 
+    /// Make sure the forces have the right sign
+    /// and self-forces sum to zero within discretization error
+    #[test]
+    fn test_body_force_density() {
+        let (rtol, atol) = (5e-2, 1e-10);
+
+        let ndiscr = 100; // Discretizations of circular filament into linear filaments
+
+        // Make some circular filaments
+        let (rfil, zfil, nfil) = example_circular_filaments();
+
+        // For filament self-field, use the filament roots as the observation points
+        for i in 0..rfil.len() {
+            let (ri, zi, ni) = (rfil[i], zfil[i], nfil[i]);
+
+            let (x, y, z) = discretize_circular_filament(ri, zi, ndiscr);
+            let dl = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
+            let (jxbx, jxby, jxbz) = (
+                &mut vec![0.0; ndiscr - 1],
+                &mut vec![0.0; ndiscr - 1],
+                &mut vec![0.0; ndiscr - 1],
+            );
+            body_force_density_linear_filament(
+                ((&x, &y, &z), ni),
+                (&x[..ndiscr - 1], &y[..ndiscr - 1], &z[..ndiscr - 1]),
+                dl,
+                (jxbx, jxby, jxbz),
+            )
+            .unwrap();
+
+            // Make sure the totals sum to zero - a magnet can't put a net force on itself
+            let jxbx_sum: f64 = jxbx.iter().sum();
+            let jxby_sum: f64 = jxby.iter().sum();
+            let jxbz_sum: f64 = jxbz.iter().sum();
+            assert!(approx(0.0, jxbx_sum, rtol, atol));
+            assert!(approx(0.0, jxby_sum, rtol, atol));
+            assert!(approx(0.0, jxbz_sum, rtol, atol));
+
+            // Make sure jxb points outward everywhere
+            for j in 0..ndiscr - 1 {
+                let r = (x[i], y[i], z[i]);
+                let rxjxb = cross3(r.0, r.1, r.2, jxbx[j], jxby[j], jxbz[j]);
+                // Linear filaments aren't perfectly aligned, so we need a slighter wider tolerance here
+                assert!(approx(0.0, rss3(rxjxb.0, rxjxb.1, rxjxb.2), rtol, 1e-7));
+            }
+        }
+
+        // For filament pairs, make sure axial force is pulling them together
+        for i in 0..rfil.len() {
+            let (ri, zif, ni) = (rfil[i], zfil[i], nfil[i]);
+            let (xi, yi, zi) = discretize_circular_filament(ri, zif, ndiscr);
+
+            for j in 0..rfil.len() {
+                // Self-field examined separately
+                if j == i {
+                    continue
+                }
+
+                let (rj, zjf, nj) = (rfil[j], zfil[j], nfil[j]);
+                let (xj, yj, zj) = discretize_circular_filament(rj, zjf, ndiscr);
+                let dl = (&diff(&xj)[..], &diff(&yj)[..], &diff(&zj)[..]);
+                let mid = (
+                    &midpoints(&xj)[..],
+                    &midpoints(&yj)[..],
+                    &midpoints(&zj)[..],
+                );
+
+                let (jxbx, jxby, jxbz) = (
+                    &mut vec![0.0; ndiscr - 1],
+                    &mut vec![0.0; ndiscr - 1],
+                    &mut vec![0.0; ndiscr - 1],
+                );
+                body_force_density_linear_filament(
+                    ((&xi, &yi, &zi), ni * nj),
+                    mid,
+                    dl,
+                    (jxbx, jxby, jxbz),
+                )
+                .unwrap();
+
+                // Expect attracting force from j toward i,
+                // and no centering force because the loops are coaxial
+                let jxbx_sum: f64 = jxbx.iter().sum();
+                let jxby_sum: f64 = jxby.iter().sum();
+                let jxbz_sum: f64 = jxbz.iter().sum();
+                assert!(approx(0.0, jxbx_sum, rtol, atol));
+                assert!(approx(0.0, jxby_sum, rtol, atol));
+                assert!(jxbz_sum.signum() == (zif - zjf).signum());
+
+            }
+        }
+    }
+
     /// Check that B = curl(A)
     #[test]
     fn test_vector_potential() {

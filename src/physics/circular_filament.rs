@@ -959,8 +959,8 @@ mod test {
     use super::*;
     use crate::{physics::linear_filament::body_force_density_linear_filament, testing::*};
 
-    /// Make sure that force is equal and opposite
-    /// and has the right sign for simple geometries
+    /// Make sure that force between a circular filament and a piecewise linear filament
+    /// is equal and opposite
     #[test]
     fn test_body_force_density() {
         // Because the force from the circular filament to the lienar filament is calculated
@@ -1015,7 +1015,7 @@ mod test {
             // For second-order accuracy, target filament midpoints are used.
             body_force_density_linear_filament(
                 (xyzfil, 1.0),
-                (&midpoints(xi), &midpoints(yi), &midpoints(zi)),
+                (&midpoints(&xi), &midpoints(&yi), &midpoints(&zi)),
                 dl2,
                 (outxi, outyi, outzi),
             )

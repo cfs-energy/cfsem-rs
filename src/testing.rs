@@ -86,7 +86,7 @@ pub(crate) fn example_circular_filaments() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
 
 // Midpoints between each pair of points.
 // Output is 1 index shorter than input.
-pub(crate) fn midpoints(x: Vec<f64>) -> Vec<f64> {
+pub(crate) fn midpoints(x: &[f64]) -> Vec<f64> {
     x[..]
         .iter()
         .zip(x[1..].iter())
