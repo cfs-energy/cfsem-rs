@@ -1,9 +1,49 @@
-//! Meshing and filamentization functions.
+//! Meshing and filamentization functions and data structures.
 use crate::math::{cross3, dot3, rss3};
 use core::f64::consts::PI;
 
 use nalgebra::geometry::Rotation3;
 use nalgebra::Vector3;
+
+use num_traits::Float;
+
+/// Linear segments in cartesian coordinates,
+/// defined in mesh format as references to points.
+pub struct MeshSegmentList<T>
+where
+    T: Float + Into<f64> + From<f64> + Send + Sync,
+{
+    /// Points in cartesian coordinates
+    nodes: Vec<(T, T, T)>,
+    /// Line segments defined by the indices of the start and end nodes
+    edges: Vec<(usize, usize)>,
+}
+
+impl<T> MeshSegmentList<T>
+where
+    T: Float + Into<f64> + From<f64> + Send + Sync,
+{
+    /// Check validity of segment indices & store
+    pub fn new(nodes: Vec<(T, T, T)>, edges: Vec<(usize, usize)>) -> Result<Self, &'static str> {
+        // Check if node indices are valid
+        let n = nodes.len();
+        if edges.iter().any(|e| e.0 > n - 1 || e.1 > n - 1) {
+            return Err("Segment refers to non-existent node");
+        }
+
+        Ok(Self { nodes, edges })
+    }
+
+    /// Immutable reference to node list
+    pub fn nodes(&self) -> &[(T, T, T)] {
+        &self.nodes[..]
+    }
+
+    /// Immutable reference to edge indices
+    pub fn edges(&self) -> &[(usize, usize)] {
+        &self.edges[..]
+    }
+}
 
 /// Filamentize a helix about an arbitrary piecewise-linear path.
 ///

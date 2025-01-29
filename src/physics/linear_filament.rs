@@ -685,7 +685,6 @@ mod test {
                 assert!(approx(0.0, jxbx_sum, rtol, atol));
                 assert!(approx(0.0, jxby_sum, rtol, atol));
                 assert!(jxbz_sum.signum() == (zif - zjf).signum());
-
             }
         }
     }
