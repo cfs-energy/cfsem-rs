@@ -26,6 +26,9 @@ lto = true
 codegen-units = 1
 overflow-checks = true
 
+[profile.dev]
+opt-level = 3
+
 [[bench]]
 name = "linear_filament"
 harness = false

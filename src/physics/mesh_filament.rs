@@ -5,28 +5,54 @@ use rayon::{
     slice::ParallelSliceMut,
 };
 
-use num_traits::Float;
+use num_traits::{Float, NumCast};
 
-use crate::{math::rss3, mesh::MeshSegmentList, MU0_OVER_4PI};
+use crate::{math::rss3, mesh::MeshEdgeList, MU0_OVER_4PI};
 use crate::{
     math::{decompose_filament, dot3},
     physics::linear_filament::vector_potential_linear_filament_scalar,
 };
 
 /// Convert a point to f64 values
+///
+/// # Panics
+///
+/// * On encountering a value in the input that is not representable as type [T].
 fn convert_point<T>(p: (T, T, T)) -> (f64, f64, f64)
 where
-    T: Into<f64>,
+    T: NumCast,
 {
-    (p.0.into(), p.1.into(), p.2.into())
+    (
+        NumCast::from(p.0).unwrap(),
+        NumCast::from(p.1).unwrap(),
+        NumCast::from(p.2).unwrap(),
+    )
 }
 
 /// Mutual inductance from each edge in mesh 1 to each edge in mesh 2.
 /// If mesh 2 is not populated, the self-inductance of mesh 1 is taken,
 /// using the thin-filament scalar self-inductance for self-terms.
-pub fn mesh_inductance<T>(m1: &MeshSegmentList<T>, m2: Option<&MeshSegmentList<T>>) -> Vec<T>
+///
+/// Can take in geometry and return mutual inductances in either 32-bit or 64-bit
+/// float format, but in all cases, internal calculations are done with 64-bit floats.
+///
+/// # Panics
+///
+/// * On encountering a value in the input that is not representable as type [T].
+///
+/// # Arguments
+///
+/// * m1: Mesh node coordinates (in meters) and edge indices for first mesh
+/// * m2: Optional mesh node coordinates (in meters) and edge indices for second mesh.
+///       If not populated, the self-inductance matrix of mesh `m1` is calculated.
+///
+/// # Returns
+///
+/// * Mutual inductance matrix from edges of `m1` to `m2`, flattened, in canonical array order.
+///   Reshape like (m1.edges().len(), m2.edges.len()) to restore square format without reallocating.
+pub fn mesh_inductance<T>(m1: &MeshEdgeList<T>, m2: Option<&MeshEdgeList<T>>) -> Vec<T>
 where
-    T: Float + Into<f64> + From<f64> + Send + Sync,
+    T: Float + Send + Sync,
 {
     // If there is no second mesh, we're doing self inductance
     let self_inductance = m2.is_none();
@@ -56,7 +82,7 @@ where
             if self_inductance && i == j {
                 let (start, end, _) = xyzifil1;
                 let length = rss3(end.0 - start.0, end.1 - start.1, end.2 - start.2);
-                o[j] = (0.5 * MU0_OVER_4PI * length).into();
+                o[j] = NumCast::from(0.5 * MU0_OVER_4PI * length).unwrap();
                 continue;
             }
 
@@ -75,9 +101,61 @@ where
 
             //    Take M = dot((A/I), dL)
             let m = dot3(ax_per_amp, ay_per_amp, az_per_amp, dl2.0, dl2.1, dl2.2);
-            o[j] = m.into();
+            o[j] = NumCast::from(m).unwrap();
         }
     });
 
     out
+}
+
+#[cfg(test)]
+mod test {
+    use crate::testing::*;
+
+    use super::mesh_inductance;
+
+    #[test]
+    fn test_mesh_inductance() {
+        // Vector potential method should give the exact same result
+        // as Neumann's formula
+        let (rtol, atol) = (1e-10, 1e-10);
+
+        // Build meshes from the same helix as the filaments
+        let mesh64 = example_mesh::<f64>();
+        let mesh32 = example_mesh::<f32>();
+
+        // Total self-inductance for 64-bit mesh
+        let mesh_self_inductance_f64: f64 = mesh_inductance(&mesh64, None).iter().sum();
+
+        // Total self-inductance for 32-bit mesh; do sum as f64 to avoid excessive roundoff
+        let mesh_self_inductance_f32: f64 = mesh_inductance::<f32>(&mesh32, None)
+            .iter()
+            .map(|v| *v as f64)
+            .sum();
+
+        // 64-bit filament
+        let (x, y, z) = example_helix();
+        let dl = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
+        let n = x.len() - 1;
+        let xyzfil = (&x[..n], &y[..n], &z[..n]);
+        let filament_self_inductance =
+            crate::physics::linear_filament::inductance_piecewise_linear_filaments(
+                xyzfil, dl, xyzfil, dl, true,
+            )
+            .unwrap();
+
+        // Make sure mesh calcs match
+        assert!(approx(
+            filament_self_inductance,
+            mesh_self_inductance_f64,
+            rtol,
+            atol
+        ));
+        assert!(approx(
+            filament_self_inductance,
+            mesh_self_inductance_f32,
+            rtol,
+            atol
+        ));
+    }
 }

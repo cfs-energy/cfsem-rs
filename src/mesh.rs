@@ -9,9 +9,9 @@ use num_traits::Float;
 
 /// Linear segments in cartesian coordinates,
 /// defined in mesh format as references to points.
-pub struct MeshSegmentList<T>
+pub struct MeshEdgeList<T>
 where
-    T: Float + Into<f64> + From<f64> + Send + Sync,
+    T: Float + Send + Sync,
 {
     /// Points in cartesian coordinates
     nodes: Vec<(T, T, T)>,
@@ -19,9 +19,9 @@ where
     edges: Vec<(usize, usize)>,
 }
 
-impl<T> MeshSegmentList<T>
+impl<T> MeshEdgeList<T>
 where
-    T: Float + Into<f64> + From<f64> + Send + Sync,
+    T: Float + Send + Sync,
 {
     /// Check validity of segment indices & store
     pub fn new(nodes: Vec<(T, T, T)>, edges: Vec<(usize, usize)>) -> Result<Self, &'static str> {
