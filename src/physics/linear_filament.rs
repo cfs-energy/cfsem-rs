@@ -27,7 +27,7 @@ use crate::MU0_OVER_4PI;
 ///
 /// When `self_inductance` flag is set, zeroes-out the contributions from self-pairings
 /// to resolve the thin-filament self-inductance singularity and replaces the
-/// segment self-inductance term with an analytic value from \[3\].
+/// segment self-inductance term with an analytic value from equation 4 (with Y=1/2) of \[3\].
 ///
 /// # Assumptions
 ///
