@@ -7,38 +7,23 @@ use rayon::{
 
 use num_traits::{Float, NumCast};
 
-use crate::{math::rss3, mesh::MeshEdgeList, MU0_OVER_4PI};
+use crate::{math::rss3, mesh::{MeshEdgeList, convert_point}, MU0_OVER_4PI};
 use crate::{
     math::{decompose_filament, dot3},
     physics::linear_filament::vector_potential_linear_filament_scalar,
 };
 
-/// Convert a point to f64 values
-///
-/// # Panics
-///
-/// * On encountering a value in the input that is not representable as type [T].
-fn convert_point<T>(p: (T, T, T)) -> (f64, f64, f64)
-where
-    T: NumCast,
-{
-    (
-        NumCast::from(p.0).unwrap(),
-        NumCast::from(p.1).unwrap(),
-        NumCast::from(p.2).unwrap(),
-    )
-}
-
 /// Mutual inductance from each edge in mesh 1 to each edge in mesh 2.
 /// If mesh 2 is not populated, the self-inductance of mesh 1 is taken,
 /// using the thin-filament scalar self-inductance for self-terms.
 ///
-/// Can take in geometry and return mutual inductances in either 32-bit or 64-bit
+/// Can take in geometry and return mutual inductances in an arbitrary choice of
 /// float format, but in all cases, internal calculations are done with 64-bit floats.
 ///
 /// # Panics
 ///
-/// * On encountering a value in the input that is not representable as type [T].
+/// * On encountering a value in the input that is not representable as 64-bit float.
+///   For inputs in lower widths of standard float types (f16, f32), this is unreachable.
 ///
 /// # Arguments
 ///
@@ -48,9 +33,10 @@ where
 ///
 /// # Returns
 ///
-/// * Mutual inductance matrix from edges of `m1` to `m2`, flattened, in canonical array order.
-///   Reshape like (m1.edges().len(), m2.edges.len()) to restore square format without reallocating.
-pub fn mesh_inductance<T>(m1: &MeshEdgeList<T>, m2: Option<&MeshEdgeList<T>>) -> Vec<T>
+/// * (m*n)-length mutual inductance matrix from edges of `m1` to `m2`, flattened, in canonical array order,
+///   where `m = m1.edges().len()` and `n = m2.edges.len()`.
+///   Reshape like (m, n) to restore square format without reallocating.
+pub fn mesh_edge_inductance<T>(m1: &MeshEdgeList<T>, m2: Option<&MeshEdgeList<T>>) -> Vec<T>
 where
     T: Float + Send + Sync,
 {
@@ -112,10 +98,10 @@ where
 mod test {
     use crate::testing::*;
 
-    use super::mesh_inductance;
+    use super::mesh_edge_inductance;
 
     #[test]
-    fn test_mesh_inductance() {
+    fn test_mesh_edge_inductance() {
         // Vector potential method should give the exact same result
         // as Neumann's formula
         let (rtol, atol) = (1e-10, 1e-10);
@@ -125,10 +111,10 @@ mod test {
         let mesh32 = example_mesh::<f32>();
 
         // Total self-inductance for 64-bit mesh
-        let mesh_self_inductance_f64: f64 = mesh_inductance(&mesh64, None).iter().sum();
+        let mesh_self_inductance_f64: f64 = mesh_edge_inductance(&mesh64, None).iter().sum();
 
         // Total self-inductance for 32-bit mesh; do sum as f64 to avoid excessive roundoff
-        let mesh_self_inductance_f32: f64 = mesh_inductance::<f32>(&mesh32, None)
+        let mesh_self_inductance_f32: f64 = mesh_edge_inductance::<f32>(&mesh32, None)
             .iter()
             .map(|v| *v as f64)
             .sum();
