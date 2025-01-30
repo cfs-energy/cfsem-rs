@@ -18,7 +18,9 @@ use crate::{
 /// using the thin-filament scalar self-inductance for self-terms.
 ///
 /// Can take in geometry and return mutual inductances in an arbitrary choice of
-/// float format, but in all cases, internal calculations are done with 64-bit floats.
+/// float format, but in all cases, internal calculations are done with 64-bit floats
+/// and parallelized over rows of the resulting matrix (each chunk accounts for
+/// the contribution of one edge in mesh 1 to every edge in mesh 2).
 ///
 /// # Panics
 ///

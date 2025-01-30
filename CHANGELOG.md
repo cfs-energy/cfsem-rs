@@ -15,6 +15,9 @@
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
 * Add `decompose_filament` function for converting the start and end points of a filament to the midpoint and length vector
 * Add `body_force_density_linear_filament` and `body_force_density_circular_filament_cartesian` families of functions for calculating JxB force density
+* Add `mesh_filament` module and `mesh_edge_inductance` function for calculating full inductance matrix over a collection of disjoint segments
+    * Same throughput perf as linear filament inductance for a given input geometry, but allocates for the full NxM output matrix
+* Add `point_source` module with dipole field
 * Add `testing` module with array-handling utilities for tests
 
 ### Changed
