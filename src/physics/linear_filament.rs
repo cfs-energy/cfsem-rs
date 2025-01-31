@@ -152,12 +152,16 @@ pub fn inductance_piecewise_linear_filaments(
 ///
 /// # Arguments
 ///
-/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
-/// * `xyzobs`:   (m, A) Observation point coords, each length `n` with scalar current
-/// * `out`:      (T) B-field at observation points, each length `n`
+/// * `xyzp`:     (m) Observation point coords, each length `n`
+/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
+/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
+/// * `ifil`:     (A) Filament current, length `m`
+/// * `out`:      (T) bx, by, bz at observation points, each length `n`
 pub fn flux_density_linear_filament_par(
-    xyzifil: ((&[f64], &[f64], &[f64]), f64),
     xyzp: (&[f64], &[f64], &[f64]),
+    xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
+    ifil: &[f64],
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
@@ -178,7 +182,7 @@ pub fn flux_density_linear_filament_par(
     // Run calcs
     bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
         .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
-            flux_density_linear_filament(xyzifil, (xp, yp, zp), (bx, by, bz))
+            flux_density_linear_filament((xp, yp, zp), xyzfil, dlxyzfil, ifil, (bx, by, bz))
         })?;
 
     Ok(())
@@ -189,17 +193,22 @@ pub fn flux_density_linear_filament_par(
 ///
 /// # Arguments
 ///
-/// * `xyzifil`:  (m) Filament start/end coords, each length `m` with scalar current
-/// * `xyzobs`:   (m, A) Observation point coords, each length `n` with scalar current
-/// * `out`:      (T) B-field at observation points, each length `n`
+/// * `xyzp`:     (m) Observation point coords, each length `n`
+/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
+/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
+/// * `ifil`:     (A) Filament current, length `m`
+/// * `out`:      (T) bx, by, bz at observation points, each length `n`
 pub fn flux_density_linear_filament(
-    xyzifil: ((&[f64], &[f64], &[f64]), f64),
     xyzp: (&[f64], &[f64], &[f64]),
+    xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
+    ifil: &[f64],
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Unpack
     let (xp, yp, zp) = xyzp;
-    let ((xfil, yfil, zfil), ifil) = xyzifil;
+    let (xfil, yfil, zfil) = xyzfil;
+    let (dlxfil, dlyfil, dlzfil) = dlxyzfil;
 
     let (bx, by, bz) = out;
 
@@ -217,28 +226,32 @@ pub fn flux_density_linear_filament(
         || xfil.len() != n
         || yfil.len() != n
         || zfil.len() != n
+        || dlxfil.len() != n
+        || dlyfil.len() != n
+        || dlzfil.len() != n
+        || ifil.len() != n
     {
         return Err("Input length mismatch");
     }
 
-    // Zero inputs
+    // Zero output
     bx.fill(0.0);
     by.fill(0.0);
     bz.fill(0.0);
 
     // For each filament, evaluate the contribution to each observation point
-    for i in 0..n - 1 {
+    for i in 0..n {
         for j in 0..m {
-            // The inner function is inlined, so values that are reused between iterations
-            // can be pulled to the outer scope by the compiler and do not affect performance
+            // Filament
+            let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] start point
+            let fil1 = (fil0.0 + dlxfil[i], fil0.1 + dlyfil[i], fil0.2 + dlzfil[i]); // [m] end point
+            let current = ifil[i];
 
-            // Geometry
-            let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] this filament start
-            let fil1 = (xfil[i + 1], yfil[i + 1], zfil[i + 1]); // [m] this filament end
-            let obs = (xp[j], yp[j], zp[j]); // [m] this observation point
+            // Observation point
+            let obs = (xp[j], yp[j], zp[j]); // [m]
 
-            // [T] flux density contribution of this filament to this observation point
-            let (bxc, byc, bzc) = flux_density_linear_filament_scalar((fil0, fil1, ifil), obs);
+            // B-field contributions
+            let (bxc, byc, bzc) = flux_density_linear_filament_scalar((fil0, fil1, current), obs);
             bx[j] += bxc;
             by[j] += byc;
             bz[j] += bzc;
@@ -652,7 +665,7 @@ mod test {
             for j in 0..rfil.len() {
                 // Self-field examined separately
                 if j == i {
-                    continue
+                    continue;
                 }
 
                 let (rj, zjf, nj) = (rfil[j], zfil[j], nfil[j]);
