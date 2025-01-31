@@ -175,8 +175,8 @@ mod test {
 
         // Make an equivalent dipole
         let loc = (0.0, 0.0, zfil);
-        let s = PI * rfil.powf(2.0); // [m^2]
-        let m = s * ifil; // [A-m^2], magentic moment of circular filament
+        let s = PI * rfil.powf(2.0); // [m^2] poloidal area of circular filament
+        let m = s * ifil; // [A-m^2], magnetic moment of circular filament
         let moment = (0.0, 0.0, m); // [A-m^2], magnetic moment of dipole
 
         // Make a mesh of evaluation points
