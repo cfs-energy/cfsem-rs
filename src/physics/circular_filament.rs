@@ -995,7 +995,8 @@ mod test {
             &mut x.clone()[..n - 1],
             &mut x.clone()[..n - 1],
         );
-        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, (outx, outy, outz)).unwrap();
+        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, (outx, outy, outz))
+            .unwrap();
         let out_sum: (f64, f64, f64) = (outx.iter().sum(), outy.iter().sum(), outz.iter().sum());
 
         // Calculate force from helix to circular filaments
@@ -1074,15 +1075,26 @@ mod test {
             let ndiscr = 400;
             let xyzfil0 = discretize_circular_filament(r, z, ndiscr);
             let xyzfil0 = (&xyzfil0.0[..], &xyzfil0.1[..], &xyzfil0.2[..]);
+            let dlxyzfil = (
+                &diff(&xyzfil0.0)[..],
+                &diff(&xyzfil0.1)[..],
+                &diff(&xyzfil0.2)[..],
+            );
 
-            let ifil = 1.0;
+            let ifil = vec![nturns; ndiscr - 1];
             let (xcontrib, ycontrib, zcontrib) =
                 (&mut x.clone()[..], &mut x.clone()[..], &mut x.clone()[..]);
 
             // Do calc
             crate::physics::linear_filament::flux_density_linear_filament_par(
-                (xyzfil0, ifil * nturns),
                 xyzobs,
+                (
+                    &xyzfil0.0[..ndiscr - 1],
+                    &xyzfil0.1[..ndiscr - 1],
+                    &xyzfil0.2[..ndiscr - 1],
+                ),
+                dlxyzfil,
+                &ifil[..],
                 (xcontrib, ycontrib, zcontrib),
             )
             .unwrap();
