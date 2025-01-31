@@ -7,9 +7,12 @@ use rayon::{
 };
 
 use crate::math::{cross3, decompose_filament, dot3, rss3};
-use crate::MU0_OVER_4PI;
+
+use crate::{macros::*, MU0_OVER_4PI};
 
 /// Estimate the mutual inductance between two piecewise-linear current filaments.
+///
+/// Uses filament midpoints as field source and target.
 ///
 /// # Arguments
 ///
@@ -27,7 +30,8 @@ use crate::MU0_OVER_4PI;
 ///
 /// When `self_inductance` flag is set, zeroes-out the contributions from self-pairings
 /// to resolve the thin-filament self-inductance singularity and replaces the
-/// segment self-inductance term with an analytic value from equation 4 (with Y=1/2) of \[3\].
+/// segment self-inductance term with an analytic value from equation 4 (with Y=1/2) of \[3\],
+/// which is a scalar-per-length value for low-frequency operation (uniform section current).
 ///
 /// # Assumptions
 ///
@@ -147,8 +151,11 @@ pub fn inductance_piecewise_linear_filaments(
 }
 
 /// Biot-Savart calculation for B-field contribution from many current filament
-/// segments to many observation points. This variant of the function is
-/// parallelized over chunks of observation points.
+/// segments to many observation points.
+///
+/// Uses filament midpoint as field source.
+///
+/// This variant of the function is parallelized over chunks of observation points.
 ///
 /// # Arguments
 ///
@@ -190,6 +197,8 @@ pub fn flux_density_linear_filament_par(
 
 /// Biot-Savart calculation for B-field contribution from many current filament
 /// segments to many observation points.
+///
+/// Uses filament midpoint as field source.
 ///
 /// # Arguments
 ///
@@ -267,6 +276,8 @@ pub fn flux_density_linear_filament(
 /// Biot-Savart calculation for B-field contribution from many current filament
 /// segments to many observation points.
 ///
+/// Uses filament midpoint as field source.
+///
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
@@ -314,8 +325,11 @@ pub fn flux_density_linear_filament_scalar(
 }
 
 /// Vector potential calculation for A-field contribution from many current filament
-/// segments to many observation points. This variant of the function is
-/// parallelized over chunks of observation points.
+/// segments to many observation points.
+///
+/// Uses filament midpoint as field source.
+///
+/// This variant of the function is parallelized over chunks of observation points.
 ///
 /// # Arguments
 ///
@@ -357,6 +371,8 @@ pub fn vector_potential_linear_filament_par(
 
 /// Vector potential calculation for A-field contribution from many current filament
 /// segments to many observation points.
+///
+/// Uses filament midpoint as field source.
 ///
 /// # Arguments
 ///
@@ -434,6 +450,8 @@ pub fn vector_potential_linear_filament(
 /// Vector potential (A-field) from a linear current
 /// filament segment to an observation point.
 ///
+/// Uses filament midpoint as field source.
+///
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
@@ -472,6 +490,8 @@ pub fn vector_potential_linear_filament_scalar(
 /// JxB (Lorentz) body force density (per volume) due to a linear current
 /// filament segment at an observation point with some current density (per area).
 ///
+/// Uses filament midpoint as field source.
+///
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
@@ -496,6 +516,8 @@ pub fn body_force_density_linear_filament_scalar(
 /// JxB (Lorentz) body force density (per volume) due to a linear current
 /// filament segment at an observation point with some current density (per area).
 ///
+/// Uses filament midpoint as field source.
+///
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
@@ -506,7 +528,9 @@ pub fn body_force_density_linear_filament_scalar(
 ///
 /// * `jxb`:        (N/m^3) Body force density
 pub fn body_force_density_linear_filament(
-    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
+    ifil: &[f64],
     xyzobs: (&[f64], &[f64], &[f64]),
     jobs: (&[f64], &[f64], &[f64]),
     out: (&mut [f64], &mut [f64], &mut [f64]),
@@ -514,7 +538,8 @@ pub fn body_force_density_linear_filament(
     // Unpack
     let (xp, yp, zp) = xyzobs;
     let (jx, jy, jz) = jobs;
-    let ((xfil, yfil, zfil), ifil) = xyzifil;
+    let (xfil, yfil, zfil) = xyzfil;
+    let (dlxfil, dlyfil, dlzfil) = dlxyzfil;
 
     let (outx, outy, outz) = out;
 
@@ -523,42 +548,29 @@ pub fn body_force_density_linear_filament(
     let n = xfil.len();
     let m = xp.len();
 
-    if xp.len() != m
-        || yp.len() != m
-        || zp.len() != m
-        || jx.len() != m
-        || jy.len() != m
-        || jz.len() != m
-        || outx.len() != m
-        || outy.len() != m
-        || outz.len() != m
-        || xfil.len() != n
-        || yfil.len() != n
-        || zfil.len() != n
-    {
-        return Err("Input length mismatch");
-    }
+    check_length!(n, xfil, yfil, zfil, dlxfil, dlyfil, dlzfil);
+    check_length!(m, xp, yp, zp, jx, jy, jz, outx, outy, outz);
 
     // Zero output
     outx.fill(0.0);
     outy.fill(0.0);
     outz.fill(0.0);
 
-    // For each filament, evaluate the contribution to each observation point
-    for i in 0..n - 1 {
+    // For each filament, evaluate the contribution to each observation point.
+    //
+    // The inner function is inlined, so values that are reused between iterations
+    // can be pulled to the outer scope by the compiler and do not affect performance.
+    for i in 0..n {
         for j in 0..m {
-            // The inner function is inlined, so values that are reused between iterations
-            // can be pulled to the outer scope by the compiler and do not affect performance
-
             // Geometry
             let fil0 = (xfil[i], yfil[i], zfil[i]); // [m] this filament start
-            let fil1 = (xfil[i + 1], yfil[i + 1], zfil[i + 1]); // [m] this filament end
+            let fil1 = (fil0.0 + dlxfil[i], fil0.1 + dlyfil[i], fil0.2 + dlzfil[i]); // [m] this filament end
             let obs = (xp[j], yp[j], zp[j]); // [m] this observation point
             let jj = (jx[j], jy[j], jz[j]); // [A/m^2] current density vector at obs point
 
             // [V-s/m] vector potential contribution of this filament to this observation point
             let (jxbx, jxby, jxbz) =
-                body_force_density_linear_filament_scalar((fil0, fil1, ifil), obs, jj);
+                body_force_density_linear_filament_scalar((fil0, fil1, ifil[i]), obs, jj);
             outx[j] += jxbx;
             outy[j] += jxby;
             outz[j] += jxbz;
@@ -570,6 +582,9 @@ pub fn body_force_density_linear_filament(
 
 /// JxB (Lorentz) body force density (per volume) due to a linear current
 /// filament segment at an observation point with some current density (per area).
+///
+/// Uses filament midpoint as field source.
+///
 /// This variant is parallelized over chunks of observation points.
 ///
 /// # Arguments
@@ -582,7 +597,9 @@ pub fn body_force_density_linear_filament(
 ///
 /// * `jxb`:        (N/m^3) Body force density
 pub fn body_force_density_linear_filament_par(
-    xyzifil: ((&[f64], &[f64], &[f64]), f64),
+    xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
+    ifil: &[f64],
     xyzobs: (&[f64], &[f64], &[f64]),
     jobs: (&[f64], &[f64], &[f64]),
     out: (&mut [f64], &mut [f64], &mut [f64]),
@@ -611,7 +628,9 @@ pub fn body_force_density_linear_filament_par(
         .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc.zip(jxc.zip(jyc.zip(jzc))))))))
         .try_for_each(|(outx, (outy, (outz, (xp, (yp, (zp, (jx, (jy, jz))))))))| {
             body_force_density_linear_filament(
-                xyzifil,
+                xyzfil,
+                dlxyzfil,
+                ifil,
                 (xp, yp, zp),
                 (jx, jy, jz),
                 (outx, outy, outz),
@@ -651,7 +670,9 @@ mod test {
                 &mut vec![0.0; ndiscr - 1],
             );
             body_force_density_linear_filament(
-                ((&x, &y, &z), ni),
+                (&x, &y, &z),
+                dl,
+                &vec![ni; x.len()][..],
                 (&x[..ndiscr - 1], &y[..ndiscr - 1], &z[..ndiscr - 1]),
                 dl,
                 (jxbx, jxby, jxbz),
@@ -701,7 +722,9 @@ mod test {
                     &mut vec![0.0; ndiscr - 1],
                 );
                 body_force_density_linear_filament(
-                    ((&xi, &yi, &zi), ni * nj),
+                    (&xi, &yi, &zi),
+                    dl,
+                    &vec![ni*nj; xi.len()][..],
                     mid,
                     dl,
                     (jxbx, jxby, jxbz),
