@@ -1,5 +1,7 @@
 //! Calculations for 0D field sources such as dipoles.
 
+use std::num::NonZeroUsize;
+
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
@@ -146,7 +148,79 @@ pub fn flux_density_dipole_par(
         .zip(outyc.zip(outzc.zip(obsxc.zip(obsyc.zip(obszc)))))
         .try_for_each(|(outx, (outy, (outz, (obsx, (obsy, obsz)))))| {
             flux_density_dipole(loc, moment, (obsx, obsy, obsz), (outx, outy, outz))
-        });
+        })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use std::f64::consts::PI;
+
+    use crate::testing::*;
+
+    // Make sure that far from a dipole on the Z axis, the field
+    // is consistent with a very small loop placed with the same center.
+    #[test]
+    fn test_flux_density() {
+        // At a distance much greater than the loop radius,
+        // the error between a small loop and a dipole should be
+        // almost entirely due to numerics
+        let (rtol, atol) = (1e-12, 1e-14);
+
+        // Make a small filament with unit current
+        let rfil = PI / 1000.0; // [m]
+        let zfil = 0.07; // [m]
+        let ifil = 1.0; // [A]
+
+        // Make an equivalent dipole
+        let loc = (0.0, 0.0, zfil);
+        let s = PI * rfil.powf(2.0); // [m^2]
+        let m = s * ifil; // [A-m^2], magentic moment of circular filament
+        let moment = (0.0, 0.0, m); // [A-m^2], magnetic moment of dipole
+
+        // Make a mesh of evaluation points
+        let ngrid = 6;
+        let xgrid = linspace(-1.0, 1.0, ngrid);
+        let ygrid = linspace(-1.0, 1.0, ngrid);
+        let zgrid = linspace(-1.0, 1.0, ngrid);
+        let mesh = meshgrid(&[&xgrid[..], &ygrid[..], &zgrid[..]]);
+        let (xmesh, ymesh, zmesh) = (&mesh[0], &mesh[1], &mesh[2]);
+
+        // Run both circular filament and dipole calcs at each point
+        let nobs = xmesh.len(); // number of observation points
+        let outx_circ = &mut vec![0.0; nobs][..];
+        let outy_circ = &mut vec![0.0; nobs][..];
+        let outz_circ = &mut vec![0.0; nobs][..];
+        crate::physics::circular_filament::flux_density_circular_filament_cartesian_par(
+            (&[rfil], &[zfil], &[ifil]),
+            (&xmesh[..], &ymesh[..], &zmesh[..]),
+            (outx_circ, outy_circ, outz_circ),
+        )
+        .unwrap();
+
+        let outx_dipole = &mut vec![0.0; nobs][..];
+        let outy_dipole = &mut vec![0.0; nobs][..];
+        let outz_dipole = &mut vec![0.0; nobs][..];
+        super::flux_density_dipole_par(
+            (&[loc.0], &[loc.1], &[loc.2]),
+            (&[moment.0], &[moment.1], &[moment.2]),
+            (&xmesh, &ymesh, &zmesh),
+            (outx_dipole, outy_dipole, outz_dipole),
+        )
+        .unwrap();
+
+        // Check for match between dipole and small loop
+        for i in 0..nobs {
+            assert!(approx(outx_circ[i], outx_dipole[i], rtol, atol));
+            assert!(approx(outy_circ[i], outy_dipole[i], rtol, atol));
+            assert!(approx(outz_circ[i], outz_dipole[i], rtol, atol));
+        }
+
+        println!(
+            "{:e}, {:e}",
+            outx_circ.iter().fold(0.0, |acc, v| v.abs().max(acc)),
+            outx_dipole.iter().fold(0.0, |acc, v| v.abs().max(acc))
+        );
+    }
 }

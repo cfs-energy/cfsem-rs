@@ -19,6 +19,7 @@ num-traits = { version = "0.2.19", features = ["libm"] }
 
 [dev-dependencies]
 criterion = "0.5.1"
+itertools = "0.14.0"
 
 [profile.release]
 opt-level = 3

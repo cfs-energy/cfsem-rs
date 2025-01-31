@@ -4,6 +4,8 @@ use core::f64::consts::{E, PI};
 
 use num_traits::{Float, NumCast};
 
+use itertools::{self, Itertools};
+
 use crate::mesh::MeshEdgeList;
 
 /// Div/0-resistant approximate comparison
@@ -18,6 +20,29 @@ pub(crate) fn linspace(start: f64, end: f64, n: usize) -> Vec<f64> {
     (0..n)
         .map(|i| start + (i as f64 / (n - 1) as f64) * (end - start))
         .collect::<Vec<f64>>()
+}
+
+/// Dense N-dimensional meshgrid; cartesian product of
+/// input grids, in canonical array order
+pub(crate) fn meshgrid(grids: &[&[f64]]) -> Vec<Vec<f64>> {
+    let ngrids = grids.len();
+
+    // Interleaved cartesian product
+    let interleaved = grids
+        .iter()
+        .map(|&x| x.iter())
+        .multi_cartesian_product()
+        .flatten()
+        .cloned()
+        .collect_vec();
+
+    // Deinterleave
+    let mut meshes = Vec::with_capacity(ngrids);
+    for i in 0..ngrids {
+        meshes.push(interleaved[i..].iter().step_by(3).cloned().collect_vec())
+    }
+
+    meshes
 }
 
 /// First-order forward difference; returns n-1 sized output
