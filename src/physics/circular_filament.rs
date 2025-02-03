@@ -723,8 +723,9 @@ pub fn mutual_inductance_circular_to_linear_scalar(
 ///
 /// # Arguments
 ///
-/// * `rznfil`:  (m, m, nondim) r,z-coord and number of turns of each circular filament, length `m`
-/// * `xyzfil`:  (m) filament origin coordinates for linear path, length `n`, including endpoint
+/// * `rznfil`:  (m, m, nondim) r,z-coord and number of turns of each circular filament, length `n`
+/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
+/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
 ///
 /// # Returns
 ///
@@ -732,27 +733,33 @@ pub fn mutual_inductance_circular_to_linear_scalar(
 pub fn mutual_inductance_circular_to_linear(
     rznfil: (&[f64], &[f64], &[f64]),
     xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
 ) -> Result<f64, &'static str> {
     // Check lengths; Error if they do not match
-    let n = xyzfil.0.len();
-    check_length_3tup!(n, &xyzfil);
-    if n < 2 {
+    let m = xyzfil.0.len();
+    check_length_3tup!(m, &xyzfil);
+    check_length_3tup!(m, &dlxyzfil);
+    if m < 2 {
         // Need at least 2 points to form a piecewise linear path
         return Err("Input length mismatch");
     }
 
     // Check lengths; Error if they do not match
-    let m = rznfil.0.len();
-    check_length_3tup!(m, &rznfil);
+    let n = rznfil.0.len();
+    check_length_3tup!(n, &rznfil);
 
     let mut mutual_inductance = 0.0; // [H]
 
-    for i in 0..n - 1 {
-        for j in 0..m {
+    for i in 0..m {
+        for j in 0..n {
             // The inner function is inlined, so values that are reused between iterations
             // can be pulled to the outer scope by the compiler and do not affect performance
             let xyzfil0 = (xyzfil.0[i], xyzfil.1[i], xyzfil.2[i]);
-            let xyzfil1 = (xyzfil.0[i + 1], xyzfil.1[i + 1], xyzfil.2[i + 1]);
+            let xyzfil1 = (
+                xyzfil.0[i] + dlxyzfil.0[i],
+                xyzfil.1[i] + dlxyzfil.1[i],
+                xyzfil.2[i] + dlxyzfil.2[i],
+            );
             mutual_inductance += mutual_inductance_circular_to_linear_scalar(
                 (rznfil.0[j], rznfil.1[j], rznfil.2[j]),
                 xyzfil0,
@@ -760,6 +767,56 @@ pub fn mutual_inductance_circular_to_linear(
             );
         }
     }
+
+    Ok(mutual_inductance)
+}
+
+/// Mutual inductance between a collection of circular filaments and a piecewise-linear filament.
+/// This method is much faster (~100x typically) than discretizing the circular loop
+/// into linear segments and using Neumann's formula.
+///
+/// # Arguments
+///
+/// * `rznfil`:  (m, m, nondim) r,z-coord and number of turns of each circular filament, length `n`
+/// * `xyzfil`:   (m) Filament origin coords (start of segment), each length `m`
+/// * `dlxyzfil`: (m) Filament segment length deltas, each length `m`
+///
+/// # Returns
+///
+/// * `m`: (V-s/m), phi-component of magnetic vector potential at observation locations
+pub fn mutual_inductance_circular_to_linear_par(
+    rznfil: (&[f64], &[f64], &[f64]),
+    xyzfil: (&[f64], &[f64], &[f64]),
+    dlxyzfil: (&[f64], &[f64], &[f64]),
+) -> Result<f64, &'static str> {
+    // Unpack
+    let (rfil, zfil, nfil) = rznfil;
+
+    // Chunk inputs
+    let ncores = std::thread::available_parallelism()
+        .unwrap_or(NonZeroUsize::MIN)
+        .get();
+
+    let n = (rfil.len() / ncores).max(1);
+
+    let rfilc = rfil.par_chunks(n);
+    let zfilc = zfil.par_chunks(n);
+    let nfilc = nfil.par_chunks(n);
+
+    // Run calcs
+    // We have to sum over contributions that are each individually fallible,
+    // which results in a bit of clutter with the fold-reduce pattern
+    let mutual_inductance = nfilc
+        .zip(rfilc.zip(zfilc))
+        .try_fold(
+            || 0.0,
+            |acc, (nc, (rc, zc))| {
+                let m_contrib =
+                    mutual_inductance_circular_to_linear((rc, zc, nc), xyzfil, dlxyzfil)?;
+                Ok::<f64, &'static str>(acc + m_contrib)
+            },
+        )
+        .try_reduce(|| 0.0, |acc, v| Ok(acc + v))?;
 
     Ok(mutual_inductance)
 }
@@ -890,41 +947,6 @@ pub fn body_force_density_circular_filament_cartesian_par(
         })?;
 
     Ok(())
-}
-
-pub fn mutual_inductance_circular_to_linear_par(
-    rznfil: (&[f64], &[f64], &[f64]),
-    xyzfil: (&[f64], &[f64], &[f64]),
-) -> Result<f64, &'static str> {
-    // Unpack
-    let (rfil, zfil, nfil) = rznfil;
-
-    // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (rfil.len() / ncores).max(1);
-
-    let rfilc = rfil.par_chunks(n);
-    let zfilc = zfil.par_chunks(n);
-    let nfilc = nfil.par_chunks(n);
-
-    // Run calcs
-    // We have to sum over contributions that are each individually fallible,
-    // which results in a bit of clutter with the fold-reduce pattern
-    let mutual_inductance = nfilc
-        .zip(rfilc.zip(zfilc))
-        .try_fold(
-            || 0.0,
-            |acc, (nc, (rc, zc))| {
-                let m_contrib = mutual_inductance_circular_to_linear((rc, zc, nc), xyzfil)?;
-                Ok::<f64, &'static str>(acc + m_contrib)
-            },
-        )
-        .try_reduce(|| 0.0, |acc, v| Ok(acc + v))?;
-
-    Ok(mutual_inductance)
 }
 
 #[cfg(test)]
@@ -1122,10 +1144,18 @@ mod test {
 
         // Get mutual inductance by purpose-made calc
         // [H]
-        let mutual_inductance =
-            mutual_inductance_circular_to_linear((&rfil, &zfil, &nfil), (&x, &y, &z)).unwrap();
-        let mutual_inductance_par =
-            mutual_inductance_circular_to_linear_par((&rfil, &zfil, &nfil), (&x, &y, &z)).unwrap();
+        let mutual_inductance = mutual_inductance_circular_to_linear(
+            (&rfil, &zfil, &nfil),
+            (&x[..n - 1], &y[..n - 1], &z[..n - 1]),
+            dlxyzfil1,
+        )
+        .unwrap();
+        let mutual_inductance_par = mutual_inductance_circular_to_linear_par(
+            (&rfil, &zfil, &nfil),
+            (&x[..n - 1], &y[..n - 1], &z[..n - 1]),
+            dlxyzfil1,
+        )
+        .unwrap();
 
         // Get mutual inductance by brute-force calc
         let mut mutual_inductance_2 = 0.0;
