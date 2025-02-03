@@ -1,3 +1,4 @@
+#![doc=include_str!("../README.md")]
 #![allow(non_snake_case)]
 
 pub mod math;
@@ -16,6 +17,8 @@ pub const MU0_OVER_4PI: f64 = MU_0 / (4.0 * core::f64::consts::PI);
 
 #[macro_use]
 pub(crate) mod macros {
+
+    /// Make sure the length of any number of vec/array/slice are the same.
     macro_rules! check_length {
         ($n:expr, $($y:expr),+) => {
             $(  // Repeat for all y
@@ -26,6 +29,7 @@ pub(crate) mod macros {
         };
     }
 
+    /// Make sure the lengths of 3 vec/array/slice in a tuple are the same
     macro_rules! check_length_3tup {
         ($n:expr, $x:expr) => {
             if $x.0.len() != $n || $x.1.len() != $n || $x.2.len() != $n {
