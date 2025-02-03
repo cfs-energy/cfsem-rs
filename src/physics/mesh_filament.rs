@@ -7,7 +7,11 @@ use rayon::{
 
 use num_traits::{Float, NumCast};
 
-use crate::{math::rss3, mesh::{MeshEdgeList, convert_point}, MU0_OVER_4PI};
+use crate::{
+    math::rss3,
+    mesh::{convert_point, MeshEdgeList},
+    MU0_OVER_4PI,
+};
 use crate::{
     math::{decompose_filament, dot3},
     physics::linear_filament::vector_potential_linear_filament_scalar,

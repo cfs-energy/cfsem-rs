@@ -209,23 +209,8 @@ pub fn flux_density_linear_filament(
     // the compiler will bypass vectorization
     let n = xfil.len();
     let m = xp.len();
-
-    if xp.len() != m
-        || yp.len() != m
-        || zp.len() != m
-        || bx.len() != m
-        || by.len() != m
-        || bz.len() != m
-        || xfil.len() != n
-        || yfil.len() != n
-        || zfil.len() != n
-        || dlxfil.len() != n
-        || dlyfil.len() != n
-        || dlzfil.len() != n
-        || ifil.len() != n
-    {
-        return Err("Input length mismatch");
-    }
+    check_length!(m, xp, yp, zp, bx, by, bz);
+    check_length!(n, xfil, yfil, zfil, dlxfil, dlyfil, dlzfil, ifil);
 
     // Zero output
     bx.fill(0.0);
@@ -383,24 +368,10 @@ pub fn vector_potential_linear_filament(
     // the compiler will bypass vectorization
     let n = xfil.len();
     let m = xp.len();
+    check_length!(m, xp, yp, zp, ax, ay, az);
+    check_length!(n, xfil, yfil, zfil, dlxfil, dlyfil, dlzfil, ifil);
 
-    if xp.len() != m
-        || yp.len() != m
-        || zp.len() != m
-        || ax.len() != m
-        || ay.len() != m
-        || az.len() != m
-        || xfil.len() != n
-        || yfil.len() != n
-        || zfil.len() != n
-        || dlxfil.len() != n
-        || dlyfil.len() != n
-        || dlzfil.len() != n
-        || ifil.len() != n
-    {
-        return Err("Input length mismatch");
-    }
-
+    // Zero output
     ax.fill(0.0);
     ay.fill(0.0);
     az.fill(0.0);
