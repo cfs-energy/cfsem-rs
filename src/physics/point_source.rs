@@ -8,6 +8,7 @@ use rayon::{
 };
 
 use crate::{
+    macros::check_length_3tup,
     math::{dot3, rss3},
     MU0_OVER_4PI,
 };
@@ -77,21 +78,10 @@ pub fn flux_density_dipole(
     let m = loc.0.len();
     let n = obs.0.len();
 
-    if loc.0.len() != m
-        || loc.1.len() != m
-        || loc.2.len() != m
-        || moment.0.len() != m
-        || moment.1.len() != m
-        || moment.2.len() != m
-        || obs.0.len() != n
-        || obs.1.len() != n
-        || obs.2.len() != n
-        || out.0.len() != n
-        || out.1.len() != n
-        || out.2.len() != n
-    {
-        return Err("Input length mismatch");
-    }
+    check_length_3tup!(m, &loc);
+    check_length_3tup!(m, &moment);
+    check_length_3tup!(n, &obs);
+    check_length_3tup!(n, &out);
 
     // Do calcs
     for i in 0..n {
