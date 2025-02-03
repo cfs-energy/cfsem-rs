@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0 2025-02-03
+## 2.0.0 2025-02-03
 
 ### Added
 
@@ -25,6 +25,7 @@
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
 * Use macro for checking array lengths to reduce repeated code
+* !Consolidate function signatures of circular filament calcs to reduce number of args and group args by physical association
 
 # Changelog
 
