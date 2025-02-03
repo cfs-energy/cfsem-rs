@@ -68,26 +68,10 @@ pub fn inductance_piecewise_linear_filaments(
 
     // Check lengths; Error if they do not match
     let n = xfil0.len();
-    if xfil0.len() != n
-        || yfil0.len() != n
-        || zfil0.len() != n
-        || dlxfil0.len() != n
-        || dlyfil0.len() != n
-        || dlzfil0.len() != n
-    {
-        return Err("Input length mismatch");
-    }
+    check_length!(n, xfil0, yfil0, zfil0, dlxfil0, dlyfil0, dlzfil0);
 
     let m = xfil1.len();
-    if xfil1.len() != m
-        || yfil1.len() != m
-        || zfil1.len() != m
-        || dlxfil1.len() != m
-        || dlyfil1.len() != m
-        || dlzfil1.len() != m
-    {
-        return Err("Input length mismatch");
-    }
+    check_length!(m, xfil1, yfil1, zfil1, dlxfil1, dlyfil1, dlzfil1);
 
     if self_inductance {
         if m != n {
