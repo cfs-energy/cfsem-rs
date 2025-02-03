@@ -28,7 +28,7 @@ pub(crate) mod macros {
 
     macro_rules! check_length_3tup {
         ($n:expr, $x:expr) => {
-            if $x.0.len() != $n || x.1.len() != $n || x.2.len() != $n {
+            if $x.0.len() != $n || $x.1.len() != $n || $x.2.len() != $n {
                 return Err("Length mismatch");
             }
         };

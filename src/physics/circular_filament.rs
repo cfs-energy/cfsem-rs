@@ -6,7 +6,10 @@ use rayon::{
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{cross3, dot3, ellipe, ellipk, rss3};
+use crate::{
+    macros::{check_length, check_length_3tup},
+    math::{cross3, dot3, ellipe, ellipk, rss3},
+};
 
 use crate::{MU0_OVER_4PI, MU_0};
 
@@ -112,9 +115,9 @@ pub fn flux_circular_filament(
     // Check lengths; Error if they do not match
     let m: usize = ifil.len();
     let n: usize = rprime.len();
-    if rfil.len() != m || zfil.len() != m || zprime.len() != n || out.len() != n {
-        return Err("Length mismatch");
-    }
+    check_length_3tup!(m, &rzifil);
+    check_length!(n, rprime, zprime);
+    check_length!(n, out);
 
     // Zero output
     out.fill(0.0);
@@ -292,16 +295,8 @@ pub fn flux_density_circular_filament(
     // Check lengths
     let n = ifil.len();
     let m = rprime.len();
-
-    // Check lengths; Error if they do not match
-    if rfil.len() != n
-        || zfil.len() != n
-        || zprime.len() != m
-        || out_r.len() != m
-        || out_z.len() != m
-    {
-        return Err("Length mismatch");
-    }
+    check_length_3tup!(n, &rzifil);
+    check_length!(m, &out_r, &out_z);
 
     // Zero output
     out_r.fill(0.0);
@@ -441,14 +436,11 @@ pub fn flux_density_circular_filament_cartesian(
 
     // Check lengths
     let n = ifil.len();
-    if rfil.len() != n || zfil.len() != n {
-        return Err("Length mismatch");
-    }
+    check_length_3tup!(n, &rzifil);
 
     let m = x.len();
-    if y.len() != m || z.len() != m || bx.len() != m || by.len() != m || bz.len() != m {
-        return Err("Length mismatch");
-    }
+    check_length_3tup!(m, &xyzobs);
+    check_length!(m, bx, by, bz);
 
     // Zero output
     bx.fill(0.0);
@@ -597,11 +589,9 @@ pub fn vector_potential_circular_filament(
 
     // Check lengths
     let n = ifil.len();
+    check_length_3tup!(n, &rzifil);
     let m = rprime.len();
-
-    if rfil.len() != n || zfil.len() != n || zprime.len() != m || out.len() != m {
-        return Err("Length mismatch");
-    }
+    check_length!(m, rprime, zprime, out);
 
     // Zero output
     out.fill(0.0);
@@ -745,19 +735,17 @@ pub fn mutual_inductance_circular_to_linear(
 ) -> Result<f64, &'static str> {
     // Check lengths; Error if they do not match
     let n = xyzfil.0.len();
-    if xyzfil.0.len() != n || xyzfil.1.len() != n || xyzfil.2.len() != n || n < 2
-    // Need at least 2 points to form a piecewise linear path
-    {
+    check_length_3tup!(n, &xyzfil);
+    if n < 2 {
+        // Need at least 2 points to form a piecewise linear path
         return Err("Input length mismatch");
     }
 
     // Check lengths; Error if they do not match
     let m = rznfil.0.len();
-    if rznfil.0.len() != m || rznfil.1.len() != m || rznfil.2.len() != m {
-        return Err("Length mismatch");
-    }
+    check_length_3tup!(m, &rznfil);
 
-    let mut mutual_inductance = 0.0;
+    let mut mutual_inductance = 0.0; // [H]
 
     for i in 0..n - 1 {
         for j in 0..m {
@@ -826,22 +814,9 @@ pub fn body_force_density_circular_filament_cartesian(
 
     // Check lengths
     let n = ifil.len();
-    if rfil.len() != n || zfil.len() != n {
-        return Err("Length mismatch");
-    }
-
+    check_length!(n, rfil, zfil);
     let m = x.len();
-    if y.len() != m
-        || z.len() != m
-        || jx.len() != m
-        || jy.len() != m
-        || jz.len() != m
-        || outx.len() != m
-        || outy.len() != m
-        || outz.len() != m
-    {
-        return Err("Length mismatch");
-    }
+    check_length!(m, x, y, z, jx, jy, jz, outx, outy, outz);
 
     // Zero output
     outx.fill(0.0);
