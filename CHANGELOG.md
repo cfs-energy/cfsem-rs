@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 2025-01-21
+## 1.2.0 2025-02-03
 
 ### Added
 
@@ -25,7 +25,6 @@
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
 * Use macro for checking array lengths to reduce repeated code
-* !Remove deprecated `biot_savart` module, which has been superceded by the `linear_filament` module
 
 # Changelog
 

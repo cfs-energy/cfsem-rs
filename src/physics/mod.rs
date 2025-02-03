@@ -1,4 +1,5 @@
 //! Electromagnetics calculations.
+pub mod biotsavart;
 pub mod circular_filament;
 pub mod gradshafranov;
 pub mod linear_filament;
