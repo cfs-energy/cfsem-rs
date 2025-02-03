@@ -1003,7 +1003,6 @@ mod test {
         // by discretizing circular filaments
         let mut out2_sum = (0.0, 0.0, 0.0);
         let ndiscr = 100;
-        let xyzfil = (&x[..], &y[..], &z[..]);
         let dl1 = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
         for i in 0..rfil.len() {
             let (xi, yi, zi) = discretize_circular_filament(rfil[i], zfil[i], ndiscr);
@@ -1016,7 +1015,11 @@ mod test {
             // Each filament is the same length, so we can broadcast one current value here.
             // For second-order accuracy, target filament midpoints are used.
             body_force_density_linear_filament(
-                xyzfil,
+                (
+                    &xyzfil1.0[..n - 1],
+                    &xyzfil1.1[..n - 1],
+                    &xyzfil1.2[..n - 1],
+                ),
                 dl1,
                 &vec![1.0; x.len()][..],
                 (&midpoints(&xi), &midpoints(&yi), &midpoints(&zi)),

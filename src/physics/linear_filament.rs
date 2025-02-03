@@ -670,7 +670,7 @@ mod test {
                 &mut vec![0.0; ndiscr - 1],
             );
             body_force_density_linear_filament(
-                (&x, &y, &z),
+                (&x[..ndiscr - 1], &y[..ndiscr - 1], &z[..ndiscr - 1]),
                 dl,
                 &vec![ni; x.len()][..],
                 (&x[..ndiscr - 1], &y[..ndiscr - 1], &z[..ndiscr - 1]),
@@ -700,6 +700,7 @@ mod test {
         for i in 0..rfil.len() {
             let (ri, zif, ni) = (rfil[i], zfil[i], nfil[i]);
             let (xi, yi, zi) = discretize_circular_filament(ri, zif, ndiscr);
+            let dli = (&diff(&xi)[..], &diff(&yi)[..], &diff(&zi)[..]);
 
             for j in 0..rfil.len() {
                 // Self-field examined separately
@@ -709,7 +710,7 @@ mod test {
 
                 let (rj, zjf, nj) = (rfil[j], zfil[j], nfil[j]);
                 let (xj, yj, zj) = discretize_circular_filament(rj, zjf, ndiscr);
-                let dl = (&diff(&xj)[..], &diff(&yj)[..], &diff(&zj)[..]);
+                let dlj = (&diff(&xj)[..], &diff(&yj)[..], &diff(&zj)[..]);
                 let mid = (
                     &midpoints(&xj)[..],
                     &midpoints(&yj)[..],
@@ -722,11 +723,11 @@ mod test {
                     &mut vec![0.0; ndiscr - 1],
                 );
                 body_force_density_linear_filament(
-                    (&xi, &yi, &zi),
-                    dl,
-                    &vec![ni*nj; xi.len()][..],
+                    (&xi[..ndiscr - 1], &yi[..ndiscr - 1], &zi[..ndiscr - 1]),
+                    dli,
+                    &vec![ni * nj; xi.len() - 1][..],
                     mid,
-                    dl,
+                    dlj,
                     (jxbx, jxby, jxbz),
                 )
                 .unwrap();
