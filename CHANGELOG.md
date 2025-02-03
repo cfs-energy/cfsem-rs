@@ -9,7 +9,7 @@
     * libm is a pure rust implementation of most functions from MUSL libm, and is platform-independent to the extent that the processor's implementation of floating point math conforms to IEEE-754
 * Add scalar calculations of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
     * Scalar calculations now used as the inner function in the vector loops
-    * This produces no performance regression, and some improvements in a few cases (up to a 4x speedup for some edge cases in the parallel variants)
+    * This produces no performance regression, and some improvements in a few cases, while improving readability by separating physics from array handling
 * Add `mutual_inductance_circular_to_linear` family of functions for calculating mutual inductance between circular filaments and piecewise-linear paths
 * Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
 * Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
@@ -18,15 +18,13 @@
 * Add `mesh_filament` module and `mesh_edge_inductance` function for calculating full inductance matrix over a collection of disjoint segments
     * Same throughput perf as linear filament inductance for a given input geometry, but allocates for the full NxM output matrix
 * Add `point_source` module with dipole field
-* Add `testing` module with array-handling utilities for tests
+* Add (internal) `testing` module with array-handling utilities for tests
+* Add (internal) macros for checking slice lengths
 
 ### Changed
 
 * Use `Slice::fill(0.0)` instead of manually zeroing output arrays
-* !Consolidate function signatures of `flux_density_circular_filament[_par]`, `flux_circular_filament[_par]`, `vector_potential_circular_filament[_par]`, `flux_density_linear_filament[_par]`, `vector_potential_linear_filament[_par]`,
-and `inductance_piecewise_linear_filaments`
-    * For linear filament methods, this change formalizes the filament input as a point series describing piecewise-continuous segments with the same value of current, which is a functionality-breaking change
-    * Up to 10x speedup in some cases; no effect on performance in most cases, although the reduced set of inputs eliminates multiple upstream array allocations in typical usages
+* Use macro for checking array lengths to reduce repeated code
 * !Remove deprecated `biot_savart` module, which has been superceded by the `linear_filament` module
 
 # Changelog
