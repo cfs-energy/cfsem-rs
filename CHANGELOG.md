@@ -17,6 +17,7 @@
 * Add `body_force_density_linear_filament` and `body_force_density_circular_filament_cartesian` families of functions for calculating JxB force density
 * Add `mesh_filament` module and `mesh_edge_inductance` function for calculating full inductance matrix over a collection of disjoint segments
     * Same throughput perf as linear filament inductance for a given input geometry, but allocates for the full NxM output matrix
+    * doc(hidden) for now, as the API is likely to change in the near future to avoid reallocating input data
 * Add `point_source` module with dipole field
 * Add (internal) `testing` module with array-handling utilities for tests
 * Add (internal) macros for checking slice lengths

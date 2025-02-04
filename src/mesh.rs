@@ -9,6 +9,7 @@ use num_traits::{Float, NumCast};
 
 /// Linear segments in cartesian coordinates,
 /// defined in mesh format as references to points.
+#[doc(hidden)]  // Might make breaking changes soon
 #[non_exhaustive]  // Might add more data fields later, like facets or elements
 pub struct MeshEdgeList<T>
 where
