@@ -179,8 +179,8 @@ pub fn flux_circular_filament_scalar(rzifil: (f64, f64, f64), rzobs: (f64, f64))
     let r_plus_rprime = rfil + rprime;
     let z_minus_zprime = zfil - zprime;
     let k2 = 4.0 * rrprime / (r_plus_rprime.powi(2) + z_minus_zprime.powi(2));
-    let psi = MU_0 * ifil * (rrprime / k2).sqrt() * ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2)); // [V-s]
-    psi
+    // [V-s]
+    MU_0 * ifil * (rrprime / k2).sqrt() * ((2.0 - k2) * ellipk(k2) - 2.0 * ellipe(k2))
 }
 
 /// Off-axis Br,Bz components for a circular current filament in vacuum.
@@ -658,8 +658,8 @@ pub fn vector_potential_circular_filament_scalar(
     // Factor multiplied into elliptic integral terms
     let c1 = MU0_OVER_4PI * ifil * 4.0 * rfil / denom.sqrt();
 
-    let a_phi = c0 * c1; // [V-s/m] phi-component of vector potential
-    a_phi // Other components are zero
+    // [V-s/m] phi-component of vector potential
+    c0 * c1 // Other components are zero
 }
 
 /// Mutual inductance between a circular filament and a linear filament.
@@ -713,8 +713,8 @@ pub fn mutual_inductance_circular_to_linear_scalar(
     let a_z_per_A = 0.0;
 
     // Recover mutual inductance as dot(A, dL)/I
-    let m = dot3(a_x_per_A, a_y_per_A, a_z_per_A, dlxfil, dlyfil, dlzfil);
-    m
+
+    dot3(a_x_per_A, a_y_per_A, a_z_per_A, dlxfil, dlyfil, dlzfil)
 }
 
 /// Mutual inductance between a collection of circular filaments and a piecewise-linear filament.
@@ -982,7 +982,7 @@ mod test {
             &xyzfil1.2[..n - 1],
         );
         let (x, y, z) = &xyzfil1;
-        let dl = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
+        let dl = (&diff(x)[..], &diff(y)[..], &diff(z)[..]);
 
         // Calculate force from circular filaments to helix,
         // using filament direction vector as the current density vector
@@ -1000,7 +1000,7 @@ mod test {
         // by discretizing circular filaments
         let mut out2_sum = (0.0, 0.0, 0.0);
         let ndiscr = 100;
-        let dl1 = (&diff(&x)[..], &diff(&y)[..], &diff(&z)[..]);
+        let dl1 = (&diff(x)[..], &diff(y)[..], &diff(z)[..]);
         for i in 0..rfil.len() {
             let (xi, yi, zi) = discretize_circular_filament(rfil[i], zfil[i], ndiscr);
             let (outxi, outyi, outzi) = (
@@ -1079,9 +1079,9 @@ mod test {
             let xyzfil0 = discretize_circular_filament(r, z, ndiscr);
             let xyzfil0 = (&xyzfil0.0[..], &xyzfil0.1[..], &xyzfil0.2[..]);
             let dlxyzfil = (
-                &diff(&xyzfil0.0)[..],
-                &diff(&xyzfil0.1)[..],
-                &diff(&xyzfil0.2)[..],
+                &diff(xyzfil0.0)[..],
+                &diff(xyzfil0.1)[..],
+                &diff(xyzfil0.2)[..],
             );
 
             let ifil = vec![nturns; ndiscr - 1];

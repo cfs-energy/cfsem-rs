@@ -195,7 +195,7 @@ mod test {
         super::flux_density_dipole_par(
             (&[loc.0], &[loc.1], &[loc.2]),
             (&[moment.0], &[moment.1], &[moment.2]),
-            (&xmesh, &ymesh, &zmesh),
+            (xmesh, ymesh, zmesh),
             (outx_dipole, outy_dipole, outz_dipole),
         )
         .unwrap();

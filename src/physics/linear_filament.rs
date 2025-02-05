@@ -73,10 +73,8 @@ pub fn inductance_piecewise_linear_filaments(
     let m = xfil1.len();
     check_length!(m, xfil1, yfil1, zfil1, dlxfil1, dlyfil1, dlzfil1);
 
-    if self_inductance {
-        if m != n {
-            return Err("For self-inductance runs, the two paths must be the same length and should be identical");
-        }
+    if self_inductance && m != n {
+        return Err("For self-inductance runs, the two paths must be the same length and should be identical");
     }
 
     let mut inductance: f64 = 0.0; // [H], although it is in [m] until the final calc
