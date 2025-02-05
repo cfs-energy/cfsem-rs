@@ -1,5 +1,4 @@
 //! Magnetics calculations for circular current filaments.
-use std::num::NonZeroUsize;
 
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
@@ -7,7 +6,8 @@ use rayon::{
 };
 
 use crate::{
-    macros::{check_length, check_length_3tup},
+    chunksize,
+    macros::{check_length, check_length_3tup, mut_par_chunks_3tup, par_chunks_3tup},
     math::{cross3, dot3, ellipe, ellipk, rss3},
 };
 
@@ -54,15 +54,9 @@ pub fn flux_circular_filament_par(
     let (rprime, zprime) = rzobs;
 
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (rprime.len() / ncores).max(1);
-
+    let n = chunksize(rprime.len());
     let rprimec = rprime.par_chunks(n);
     let zprimec = zprime.par_chunks(n);
-
     let outc = out.par_chunks_mut(n);
 
     // Run calcs
@@ -227,11 +221,7 @@ pub fn flux_density_circular_filament_par(
     let (out_r, out_z) = out;
 
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (rprime.len() / ncores).max(1);
+    let n = chunksize(rprime.len());
 
     let rprimec = rprime.par_chunks(n);
     let zprimec = zprime.par_chunks(n);
@@ -479,24 +469,10 @@ pub fn flux_density_circular_filament_cartesian_par(
     xyzobs: (&[f64], &[f64], &[f64]),
     bxyz_out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
-    // Unpack
-    let (x, y, z) = xyzobs;
-    let (bx, by, bz) = bxyz_out;
-
     // Chunk
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (bx.len() / ncores).max(1);
-
-    let xc = x.par_chunks(n);
-    let yc = y.par_chunks(n);
-    let zc = z.par_chunks(n);
-
-    let outbxc = bx.par_chunks_mut(n);
-    let outbyc = by.par_chunks_mut(n);
-    let outbzc = bz.par_chunks_mut(n);
+    let n = chunksize(xyzobs.0.len());
+    let (xc, yc, zc) = par_chunks_3tup!(xyzobs, n);
+    let (outbxc, outbyc, outbzc) = mut_par_chunks_3tup!(bxyz_out, n);
 
     // Evaluate
     xc.zip(yc.zip(zc.zip(outbxc.zip(outbyc.zip(outbzc)))))
@@ -535,25 +511,18 @@ pub fn vector_potential_circular_filament_par(
     out: &mut [f64],
 ) -> Result<(), &'static str> {
     // Unpack
-    let (rfil, zfil, ifil) = rzifil;
     let (rprime, zprime) = rzobs;
 
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (rprime.len() / ncores).max(1);
-
+    let n = chunksize(rprime.len());
     let rprimec = rprime.par_chunks(n);
     let zprimec = zprime.par_chunks(n);
-
     let outc = out.par_chunks_mut(n);
 
     // Run calcs
     outc.zip(rprimec.zip(zprimec))
         .try_for_each(|(outc, (rc, zc))| {
-            vector_potential_circular_filament((rfil, zfil, ifil), (rc, zc), outc)
+            vector_potential_circular_filament(rzifil, (rc, zc), outc)
         })?;
 
     Ok(())
@@ -789,19 +758,9 @@ pub fn mutual_inductance_circular_to_linear_par(
     xyzfil: (&[f64], &[f64], &[f64]),
     dlxyzfil: (&[f64], &[f64], &[f64]),
 ) -> Result<f64, &'static str> {
-    // Unpack
-    let (rfil, zfil, nfil) = rznfil;
-
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (rfil.len() / ncores).max(1);
-
-    let rfilc = rfil.par_chunks(n);
-    let zfilc = zfil.par_chunks(n);
-    let nfilc = nfil.par_chunks(n);
+    let n = chunksize(rznfil.0.len());
+    let (rfilc, zfilc, nfilc) = par_chunks_3tup!(rznfil, n);
 
     // Run calcs
     // We have to sum over contributions that are each individually fallible,
@@ -916,23 +875,10 @@ pub fn body_force_density_circular_filament_cartesian_par(
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (xyzobs.0.len() / ncores).max(1);
-
-    let xpc = xyzobs.0.par_chunks(n);
-    let ypc = xyzobs.1.par_chunks(n);
-    let zpc = xyzobs.2.par_chunks(n);
-
-    let jxc = jobs.0.par_chunks(n);
-    let jyc = jobs.1.par_chunks(n);
-    let jzc = jobs.2.par_chunks(n);
-
-    let outxc = out.0.par_chunks_mut(n);
-    let outyc = out.1.par_chunks_mut(n);
-    let outzc = out.2.par_chunks_mut(n);
+    let n = chunksize(xyzobs.0.len());
+    let (xpc, ypc, zpc) = par_chunks_3tup!(xyzobs, n);
+    let (jxc, jyc, jzc) = par_chunks_3tup!(jobs, n);
+    let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
     outxc

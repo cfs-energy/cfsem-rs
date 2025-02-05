@@ -1,14 +1,13 @@
 //! Calculations for 0D field sources such as dipoles.
 
-use std::num::NonZeroUsize;
-
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
 use crate::{
-    macros::check_length_3tup,
+    chunksize,
+    macros::{check_length_3tup, mut_par_chunks_3tup, par_chunks_3tup},
     math::{dot3, rss3},
     MU0_OVER_4PI,
 };
@@ -120,19 +119,9 @@ pub fn flux_density_dipole_par(
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let chunk_size = (obs.0.len() / ncores).max(1);
-
-    let obsxc = obs.0.par_chunks(chunk_size);
-    let obsyc = obs.1.par_chunks(chunk_size);
-    let obszc = obs.2.par_chunks(chunk_size);
-
-    let outxc = out.0.par_chunks_mut(chunk_size);
-    let outyc = out.1.par_chunks_mut(chunk_size);
-    let outzc = out.2.par_chunks_mut(chunk_size);
+    let n = chunksize(obs.0.len());
+    let (obsxc, obsyc, obszc) = par_chunks_3tup!(obs, n);
+    let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
     outxc
         .zip(outyc.zip(outzc.zip(obsxc.zip(obsyc.zip(obszc)))))

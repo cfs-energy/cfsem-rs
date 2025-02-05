@@ -1,12 +1,14 @@
 //! Magnetics calculations for piecewise-linear current filaments.
-use std::num::NonZeroUsize;
 
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
-use crate::math::{cross3, decompose_filament, dot3, rss3};
+use crate::{
+    chunksize,
+    math::{cross3, decompose_filament, dot3, rss3},
+};
 
 use crate::{macros::*, MU0_OVER_4PI};
 
@@ -154,19 +156,9 @@ pub fn flux_density_linear_filament_par(
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (xyzp.0.len() / ncores).max(1);
-
-    let xpc = xyzp.0.par_chunks(n);
-    let ypc = xyzp.1.par_chunks(n);
-    let zpc = xyzp.2.par_chunks(n);
-
-    let bxc = out.0.par_chunks_mut(n);
-    let byc = out.1.par_chunks_mut(n);
-    let bzc = out.2.par_chunks_mut(n);
+    let n = chunksize(xyzp.0.len());
+    let (xpc, ypc, zpc) = par_chunks_3tup!(xyzp, n);
+    let (bxc, byc, bzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
     bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
@@ -313,19 +305,9 @@ pub fn vector_potential_linear_filament_par(
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (xyzp.0.len() / ncores).max(1);
-
-    let xpc = xyzp.0.par_chunks(n);
-    let ypc = xyzp.1.par_chunks(n);
-    let zpc = xyzp.2.par_chunks(n);
-
-    let bxc = out.0.par_chunks_mut(n);
-    let byc = out.1.par_chunks_mut(n);
-    let bzc = out.2.par_chunks_mut(n);
+    let n = chunksize(xyzp.0.len());
+    let (xpc, ypc, zpc) = par_chunks_3tup!(xyzp, n);
+    let (bxc, byc, bzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
     bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
@@ -558,23 +540,10 @@ pub fn body_force_density_linear_filament_par(
     out: (&mut [f64], &mut [f64], &mut [f64]),
 ) -> Result<(), &'static str> {
     // Chunk inputs
-    let ncores = std::thread::available_parallelism()
-        .unwrap_or(NonZeroUsize::MIN)
-        .get();
-
-    let n = (xyzobs.0.len() / ncores).max(1);
-
-    let xpc = xyzobs.0.par_chunks(n);
-    let ypc = xyzobs.1.par_chunks(n);
-    let zpc = xyzobs.2.par_chunks(n);
-
-    let jxc = jobs.0.par_chunks(n);
-    let jyc = jobs.1.par_chunks(n);
-    let jzc = jobs.2.par_chunks(n);
-
-    let outxc = out.0.par_chunks_mut(n);
-    let outyc = out.1.par_chunks_mut(n);
-    let outzc = out.2.par_chunks_mut(n);
+    let n = chunksize(xyzobs.0.len());
+    let (xpc, ypc, zpc) = par_chunks_3tup!(xyzobs, n);
+    let (jxc, jyc, jzc) = par_chunks_3tup!(jobs, n);
+    let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
     outxc
