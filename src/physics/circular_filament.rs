@@ -21,7 +21,7 @@ use crate::{MU0_OVER_4PI, MU_0};
 ///
 /// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
-/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
+/// * `out`:     (Wb), poloidal flux at observation location, length `n`
 ///
 /// # Commentary
 ///
@@ -73,7 +73,7 @@ pub fn flux_circular_filament_par(
 ///
 /// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
-/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
+/// * `out`:     (Wb), poloidal flux at observation location, length `n`
 ///
 /// # Commentary
 ///
