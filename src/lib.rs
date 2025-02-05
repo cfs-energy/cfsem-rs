@@ -1,5 +1,7 @@
 #![doc=include_str!("../README.md")]
 #![allow(non_snake_case)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_late_init)]
 
 pub mod math;
 pub mod mesh;
