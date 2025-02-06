@@ -634,6 +634,10 @@ pub fn vector_potential_circular_filament_scalar(
 /// This method is much faster (~100x typically) than discretizing the circular loop
 /// into linear segments and using Neumann's formula.
 ///
+/// This formula is accurate only if the magnetic vector potential due to
+/// the circular filament varies negligibly over the length of the linear filament.
+/// The linear filament should be much shorter than the radius of the circular filament.
+///
 /// # Arguments
 ///
 /// * `rznfil`:    (m, m, nondim) r,z-coord and number of turns of circular filament
