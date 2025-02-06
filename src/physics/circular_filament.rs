@@ -701,7 +701,7 @@ pub fn mutual_inductance_circular_to_linear_scalar(
 ///
 /// # Returns
 ///
-/// * `m`: (V-s/m), phi-component of magnetic vector potential at observation locations
+/// * `mutual_inductance`: (H), mutual inductance
 pub fn mutual_inductance_circular_to_linear(
     rznfil: (&[f64], &[f64], &[f64]),
     xyzfil: (&[f64], &[f64], &[f64]),
