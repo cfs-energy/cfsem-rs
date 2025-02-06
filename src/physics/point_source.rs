@@ -138,7 +138,7 @@ mod test {
 
     use crate::testing::*;
 
-    // Make sure that far from a dipole on the Z axis, the field
+    // Make sure that far from a dipole, the field
     // is consistent with a very small loop placed with the same center.
     #[test]
     fn test_flux_density() {
