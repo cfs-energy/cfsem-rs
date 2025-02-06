@@ -133,9 +133,8 @@ pub fn flux_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
-/// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
-/// * `out`:     (Wb), r- and z-components of poloidal flux at observation location, length `n`
+/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament
+/// * `rzobs`:   (m, m) r-coord, and z-coord of observation point
 ///
 /// # Returns
 ///
