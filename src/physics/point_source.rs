@@ -1,7 +1,7 @@
 //! Calculations for 0D field sources such as dipoles.
 
 use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
+    iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
@@ -123,9 +123,10 @@ pub fn flux_density_dipole_par(
     let (obsxc, obsyc, obszc) = par_chunks_3tup!(obs, n);
     let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
-    outxc
-        .zip(outyc.zip(outzc.zip(obsxc.zip(obsyc.zip(obszc)))))
-        .try_for_each(|(outx, (outy, (outz, (obsx, (obsy, obsz)))))| {
+    // Run calcs
+    (outxc, outyc, outzc, obsxc, obsyc, obszc)
+        .into_par_iter()
+        .try_for_each(|(outx, outy, outz, obsx, obsy, obsz)| {
             flux_density_dipole(loc, moment, (obsx, obsy, obsz), (outx, outy, outz))
         })?;
 

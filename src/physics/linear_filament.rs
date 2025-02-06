@@ -1,7 +1,7 @@
 //! Magnetics calculations for piecewise-linear current filaments.
 
 use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
+    iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
@@ -161,8 +161,9 @@ pub fn flux_density_linear_filament_par(
     let (bxc, byc, bzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
-    bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
-        .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
+    (bxc, byc, bzc, xpc, ypc, zpc)
+        .into_par_iter()
+        .try_for_each(|(bx, by, bz, xp, yp, zp)| {
             flux_density_linear_filament((xp, yp, zp), xyzfil, dlxyzfil, ifil, (bx, by, bz))
         })?;
 
@@ -310,8 +311,9 @@ pub fn vector_potential_linear_filament_par(
     let (bxc, byc, bzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
-    bxc.zip(byc.zip(bzc.zip(xpc.zip(ypc.zip(zpc)))))
-        .try_for_each(|(bx, (by, (bz, (xp, (yp, zp)))))| {
+    (bxc, byc, bzc, xpc, ypc, zpc)
+        .into_par_iter()
+        .try_for_each(|(bx, by, bz, xp, yp, zp)| {
             vector_potential_linear_filament((xp, yp, zp), xyzfil, dlxyzfil, ifil, (bx, by, bz))
         })?;
 
@@ -546,9 +548,9 @@ pub fn body_force_density_linear_filament_par(
     let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
-    outxc
-        .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc.zip(jxc.zip(jyc.zip(jzc))))))))
-        .try_for_each(|(outx, (outy, (outz, (xp, (yp, (zp, (jx, (jy, jz))))))))| {
+    (outxc, outyc, outzc, xpc, ypc, zpc, jxc, jyc, jzc)
+        .into_par_iter()
+        .try_for_each(|(outx, outy, outz, xp, yp, zp, jx, jy, jz)| {
             body_force_density_linear_filament(
                 xyzfil,
                 dlxyzfil,

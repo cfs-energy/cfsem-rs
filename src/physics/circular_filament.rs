@@ -1,7 +1,7 @@
 //! Magnetics calculations for circular current filaments.
 
 use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
+    iter::{IntoParallelIterator, ParallelIterator},
     slice::{ParallelSlice, ParallelSliceMut},
 };
 
@@ -60,8 +60,9 @@ pub fn flux_circular_filament_par(
     let outc = out.par_chunks_mut(n);
 
     // Run calcs
-    outc.zip(rprimec.zip(zprimec))
-        .try_for_each(|(outc, (rc, zc))| flux_circular_filament(rzifil, (rc, zc), outc))?;
+    (outc, rprimec, zprimec)
+        .into_par_iter()
+        .try_for_each(|(outc, rc, zc)| flux_circular_filament(rzifil, (rc, zc), outc))?;
 
     Ok(())
 }
@@ -229,9 +230,9 @@ pub fn flux_density_circular_filament_par(
     let outzc = out_z.par_chunks_mut(n);
 
     // Run calcs
-    outrc
-        .zip(outzc.zip(rprimec.zip(zprimec)))
-        .try_for_each(|(orc, (ozc, (rc, zc)))| {
+    (outrc, outzc, rprimec, zprimec)
+        .into_par_iter()
+        .try_for_each(|(orc, ozc, rc, zc)| {
             flux_density_circular_filament(rzifil, (rc, zc), (orc, ozc))
         })?;
 
@@ -474,8 +475,9 @@ pub fn flux_density_circular_filament_cartesian_par(
     let (outbxc, outbyc, outbzc) = mut_par_chunks_3tup!(bxyz_out, n);
 
     // Evaluate
-    xc.zip(yc.zip(zc.zip(outbxc.zip(outbyc.zip(outbzc)))))
-        .try_for_each(|(xci, (yci, (zci, (bxci, (byci, bzci)))))| {
+    (xc, yc, zc, outbxc, outbyc, outbzc)
+        .into_par_iter()
+        .try_for_each(|(xci, yci, zci, bxci, byci, bzci)| {
             let xyzobs_i = (xci, yci, zci);
             let bxyz_out_i = (bxci, byci, bzci);
             flux_density_circular_filament_cartesian(rzifil, xyzobs_i, bxyz_out_i)
@@ -519,8 +521,9 @@ pub fn vector_potential_circular_filament_par(
     let outc = out.par_chunks_mut(n);
 
     // Run calcs
-    outc.zip(rprimec.zip(zprimec))
-        .try_for_each(|(outc, (rc, zc))| {
+    (outc, rprimec, zprimec)
+        .into_par_iter()
+        .try_for_each(|(outc, rc, zc)| {
             vector_potential_circular_filament(rzifil, (rc, zc), outc)
         })?;
 
@@ -764,11 +767,11 @@ pub fn mutual_inductance_circular_to_linear_par(
     // Run calcs
     // We have to sum over contributions that are each individually fallible,
     // which results in a bit of clutter with the fold-reduce pattern
-    let mutual_inductance = nfilc
-        .zip(rfilc.zip(zfilc))
+    let mutual_inductance = (nfilc, rfilc, zfilc)
+        .into_par_iter()
         .try_fold(
             || 0.0,
-            |acc, (nc, (rc, zc))| {
+            |acc, (nc, rc, zc)| {
                 let m_contrib =
                     mutual_inductance_circular_to_linear((rc, zc, nc), xyzfil, dlxyzfil)?;
                 Ok::<f64, &'static str>(acc + m_contrib)
@@ -880,9 +883,9 @@ pub fn body_force_density_circular_filament_cartesian_par(
     let (outxc, outyc, outzc) = mut_par_chunks_3tup!(out, n);
 
     // Run calcs
-    outxc
-        .zip(outyc.zip(outzc.zip(xpc.zip(ypc.zip(zpc.zip(jxc.zip(jyc.zip(jzc))))))))
-        .try_for_each(|(outx, (outy, (outz, (xp, (yp, (zp, (jx, (jy, jz))))))))| {
+    (outxc, outyc, outzc, xpc, ypc, zpc, jxc, jyc, jzc)
+        .into_par_iter()
+        .try_for_each(|(outx, outy, outz, xp, yp, zp, jx, jy, jz)| {
             body_force_density_circular_filament_cartesian(
                 rzifil,
                 (xp, yp, zp),
