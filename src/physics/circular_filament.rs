@@ -134,7 +134,7 @@ pub fn flux_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of filament
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation point
 ///
 /// # Returns
