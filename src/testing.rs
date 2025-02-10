@@ -146,3 +146,32 @@ where
 
     MeshEdgeList::new(nodes, edges).unwrap()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Check that meshgrid returns the correct shape and values for
+    /// a 2-dimensional input.
+    #[test]
+    fn test_meshgrid_2d() {
+        let x = [0.0, 1.0, 2.0];
+        let y = [3.0, 4.0, 5.0, 6.0];
+        let m = meshgrid(&[&x, &y]);
+
+        // Check that the meshgrid has the correct shape
+        assert_eq!(2, m.len()); // should be number of dimensions
+        for mi in m.iter() {
+            assert_eq!(x.len() * y.len(), mi.len());
+        }
+
+        // Check that the meshgrid contains the correct values
+        for (i, &xi) in x.iter().enumerate() {
+            for (j, &yj) in y.iter().enumerate() {
+                let k = i * y.len() + j; 
+                assert_eq!(xi, m[0][k]);
+                assert_eq!(yj, m[1][k]);
+            }
+        }
+    }
+}
