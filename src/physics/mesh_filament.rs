@@ -34,7 +34,7 @@ use crate::{
 /// # Arguments
 ///
 /// * `m1`: Mesh node coordinates (in meters) and edge indices for first mesh
-/// * m2: Optional mesh node coordinates (in meters) and edge indices for second mesh.
+/// * `m2`: Optional mesh node coordinates (in meters) and edge indices for second mesh.
 ///       If not populated, the self-inductance matrix of mesh `m1` is calculated.
 ///
 /// # Returns
