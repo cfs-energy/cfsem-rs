@@ -8,7 +8,7 @@ use itertools::{self, Itertools};
 
 use crate::mesh::MeshEdgeList;
 
-/// Div/0-resistant approximate comparison
+/// Divide-by-zero-resistant approximate comparison
 pub(crate) fn approx(truth: f64, val: f64, rtol: f64, atol: f64) -> bool {
     let abs_err = (val - truth).abs();
     let lim = rtol * truth.abs() + atol;
