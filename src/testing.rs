@@ -39,7 +39,13 @@ pub(crate) fn meshgrid(grids: &[&[f64]]) -> Vec<Vec<f64>> {
     // Deinterleave
     let mut meshes = Vec::with_capacity(ngrids);
     for i in 0..ngrids {
-        meshes.push(interleaved[i..].iter().step_by(ngrids).cloned().collect_vec())
+        meshes.push(
+            interleaved[i..]
+                .iter()
+                .step_by(ngrids)
+                .cloned()
+                .collect_vec(),
+        )
     }
 
     meshes
@@ -168,7 +174,7 @@ mod test {
         // Check that the meshgrid contains the correct values
         for (i, &xi) in x.iter().enumerate() {
             for (j, &yj) in y.iter().enumerate() {
-                let k = i * y.len() + j; 
+                let k = i * y.len() + j;
                 assert_eq!(xi, m[0][k]);
                 assert_eq!(yj, m[1][k]);
             }
