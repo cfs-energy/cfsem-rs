@@ -29,8 +29,8 @@ where
     pub fn new(nodes: Vec<(T, T, T)>, edges: Vec<(usize, usize)>) -> Result<Self, &'static str> {
         // Check if node indices are valid
         let n = nodes.len();
-        if edges.iter().any(|e| e.0 > n - 1 || e.1 > n - 1) {
-            return Err("Segment refers to non-existent node");
+        if edges.iter().any(|e| e.0 > n - 1 || e.1 > n - 1 || e.0 == e.1) {
+            return Err("Segment refers to non-existent node or collapsed edge");
         }
 
         Ok(Self { nodes, edges })
