@@ -938,6 +938,13 @@ mod test {
         let (x, y, z) = &xyzfil1;
         let dl = (&diff(x)[..], &diff(y)[..], &diff(z)[..]);
 
+        // We need a current density vector for testing that is aligned with the direction
+        // of the filament. A natural choice is to use the filament direction vector dL
+        // directly, capitalizing on the conversion between the biot-savart volume integral
+        // over cross(J, r)dV and the line integral over cross(I*dL, r) and using unit
+        // volume and area.
+        let j_vec = dl;
+
         // Calculate force from circular filaments to helix,
         // using filament direction vector as the current density vector
         // to represent unit current on the linear filaments
@@ -946,7 +953,7 @@ mod test {
             &mut x.clone()[..n - 1],
             &mut x.clone()[..n - 1],
         );
-        body_force_density_circular_filament_cartesian(rzifil, xyzobs, dl, (outx, outy, outz))
+        body_force_density_circular_filament_cartesian(rzifil, xyzobs, j_vec, (outx, outy, outz))
             .unwrap();
         let out_sum: (f64, f64, f64) = (outx.iter().sum(), outy.iter().sum(), outz.iter().sum());
 
@@ -963,6 +970,9 @@ mod test {
                 &mut zi.clone()[..ndiscr - 1],
             );
             let dl2 = (&diff(&xi)[..], &diff(&yi)[..], &diff(&zi)[..]);
+            // Using the target filament direction as the current density vector again for convenience,
+            let j2 = dl2;
+
             // Each filament is the same length, so we can broadcast one current value here.
             // For second-order accuracy, target filament midpoints are used.
             body_force_density_linear_filament(
@@ -974,7 +984,7 @@ mod test {
                 dl1,
                 &vec![1.0; x.len()][..],
                 (&midpoints(&xi), &midpoints(&yi), &midpoints(&zi)),
-                dl2,
+                j2,
                 (outxi, outyi, outzi),
             )
             .unwrap();
