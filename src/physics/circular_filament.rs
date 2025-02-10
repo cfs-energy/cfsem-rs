@@ -318,7 +318,7 @@ pub fn flux_density_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 ///
 /// # Returns
