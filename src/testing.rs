@@ -63,11 +63,11 @@ pub(crate) fn discretize_circular_filament(
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let x: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
         .iter()
-        .map(|v| r * v.cos())
+        .map(|v| r * libm::cos(*v))
         .collect();
     let y: Vec<f64> = linspace(0.0, 2.0 * PI, ndiscr)
         .iter()
-        .map(|v| r * v.sin())
+        .map(|v| r * libm::sin(*v))
         .collect();
     let z: Vec<f64> = (0..ndiscr).map(|_| z).collect();
     (x, y, z)
