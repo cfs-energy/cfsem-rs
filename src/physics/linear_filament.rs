@@ -396,7 +396,7 @@ pub fn vector_potential_linear_filament(
 ///
 /// # Returns
 ///
-/// * `a`:        (V-s/m) Vector potential
+/// * `a`:        (V-s/m) Vector potential x, y, z components
 #[inline]
 pub fn vector_potential_linear_filament_scalar(
     xyzifil: ((f64, f64, f64), (f64, f64, f64), f64),
