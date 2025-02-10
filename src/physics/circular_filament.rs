@@ -182,7 +182,7 @@ pub fn flux_circular_filament_scalar(rzifil: (f64, f64, f64), rzobs: (f64, f64))
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
@@ -243,7 +243,7 @@ pub fn flux_density_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of each observation point, length `n`
 /// * `out`:     (T, T), r- and z-components of magnetic flux density at observation location, length `n`
 ///
@@ -491,7 +491,7 @@ pub fn flux_density_circular_filament_cartesian_par(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation points, length `n`
 /// * `out`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
 ///
@@ -534,7 +534,7 @@ pub fn vector_potential_circular_filament_par(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of each filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of each filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation points, length `n`
 /// * `out`: (V-s/m), phi-component of magnetic vector potential at observation locations, length `n`
 ///
@@ -585,7 +585,7 @@ pub fn vector_potential_circular_filament(
 ///
 /// # Arguments
 ///
-/// * `rzifil`:  (m, m, A-turns) current, r-coord, and z-coord of filament, length `m`
+/// * `rzifil`:  (m, m, A-turns) r-coord, z-coord, and current of filament, length `m`
 /// * `rzobs`:   (m, m) r-coord, and z-coord of observation point, length `n`
 ///
 /// # Returns
