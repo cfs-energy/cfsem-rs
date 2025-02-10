@@ -100,7 +100,7 @@ pub(crate) fn example_helix() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     (x, y, z)
 }
 
-/// Example set of ciruclar filaments with (r, z, n_turns) values
+/// Example set of circular filaments with (r, z, n_turns) values
 pub(crate) fn example_circular_filaments() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     // Make some circular filaments
     let r = 1.0 / PI; // [m] some number
