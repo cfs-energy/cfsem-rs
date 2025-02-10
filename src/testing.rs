@@ -39,7 +39,7 @@ pub(crate) fn meshgrid(grids: &[&[f64]]) -> Vec<Vec<f64>> {
     // Deinterleave
     let mut meshes = Vec::with_capacity(ngrids);
     for i in 0..ngrids {
-        meshes.push(interleaved[i..].iter().step_by(3).cloned().collect_vec())
+        meshes.push(interleaved[i..].iter().step_by(ngrids).cloned().collect_vec())
     }
 
     meshes
