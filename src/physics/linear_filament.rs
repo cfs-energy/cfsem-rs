@@ -573,7 +573,7 @@ mod test {
     /// and self-forces sum to zero within discretization error
     #[test]
     fn test_body_force_density() {
-        let (rtol, atol) = (5e-2, 1e-10);
+        let (rtol, atol) = (1e-9, 1e-10);
 
         let ndiscr = 100; // Discretizations of circular filament into linear filaments
 
@@ -614,7 +614,7 @@ mod test {
                 let r: (f64, f64, f64) = (x[j], y[j], 0.0);
                 let rxjxb = cross3(r.0, r.1, r.2, jxbx[j], jxby[j], jxbz[j]);
                 // Linear filaments aren't perfectly aligned, so we need a slighter wider tolerance here
-                assert!(approx(0.0, rss3(rxjxb.0, rxjxb.1, rxjxb.2), rtol, 1e-7));
+                assert!(approx(0.0, rss3(rxjxb.0, rxjxb.1, rxjxb.2), rtol, 1e-8));
             }
         }
 
