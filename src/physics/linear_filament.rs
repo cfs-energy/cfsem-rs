@@ -611,7 +611,7 @@ mod test {
 
             // Make sure jxb points outward everywhere
             for j in 0..ndiscr - 1 {
-                let r = (x[i], y[i], z[i]);
+                let r: (f64, f64, f64) = (x[j], y[j], 0.0);
                 let rxjxb = cross3(r.0, r.1, r.2, jxbx[j], jxby[j], jxbz[j]);
                 // Linear filaments aren't perfectly aligned, so we need a slighter wider tolerance here
                 assert!(approx(0.0, rss3(rxjxb.0, rxjxb.1, rxjxb.2), rtol, 1e-7));
