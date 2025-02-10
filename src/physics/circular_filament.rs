@@ -695,6 +695,7 @@ pub fn mutual_inductance_circular_to_linear_scalar(
 /// Mutual inductance between a collection of circular filaments and a piecewise-linear filament.
 /// This method is much faster (~100x typically) than discretizing the circular loop
 /// into linear segments and using Neumann's formula.
+/// Assumes all target filaments are connected electrically in series.
 ///
 /// # Arguments
 ///
@@ -749,6 +750,7 @@ pub fn mutual_inductance_circular_to_linear(
 /// Mutual inductance between a collection of circular filaments and a piecewise-linear filament.
 /// This method is much faster (~100x typically) than discretizing the circular loop
 /// into linear segments and using Neumann's formula.
+/// Assumes all target filaments are connected electrically in series.
 ///
 /// # Arguments
 ///
