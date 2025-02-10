@@ -458,12 +458,11 @@ pub fn body_force_density_linear_filament_scalar(
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `dlxyzfil`:  (m) Filament segment length deltas, each length `m`
+/// * `ifil`:      (A) Filament current, length `m`
 /// * `xyzobs`:    (m) Observation point coords
 /// * `jobs`:      (A/m^2) Current density vector at observation point
-///
-/// # Returns
-///
-/// * `jxb`:        (N/m^3) Body force density
+/// * `out`:       (N/m^3) Body force density x, y, z components
 pub fn body_force_density_linear_filament(
     xyzfil: (&[f64], &[f64], &[f64]),
     dlxyzfil: (&[f64], &[f64], &[f64]),
@@ -527,12 +526,11 @@ pub fn body_force_density_linear_filament(
 /// # Arguments
 ///
 /// * `xyzifil`:   (m, m, A) Filament start and end coords and current
+/// * `dlxyzfil`:  (m) Filament segment length deltas, each length `m`
+/// * `ifil`:      (A) Filament current, length `m`
 /// * `xyzobs`:    (m) Observation point coords
 /// * `jobs`:      (A/m^2) Current density vector at observation point
-///
-/// # Returns
-///
-/// * `jxb`:        (N/m^3) Body force density
+/// * `out`:       (N/m^3) Body force density x, y, z components
 pub fn body_force_density_linear_filament_par(
     xyzfil: (&[f64], &[f64], &[f64]),
     dlxyzfil: (&[f64], &[f64], &[f64]),
