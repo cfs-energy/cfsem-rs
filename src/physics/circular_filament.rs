@@ -641,6 +641,18 @@ pub fn vector_potential_circular_filament_scalar(
 /// the circular filament varies negligibly over the length of the linear filament.
 /// The linear filament should be much shorter than the radius of the circular filament.
 ///
+/// Discussion of the equivalence of the line integral of vector potential and the flux through a
+/// surface (the mutual inductance) can be found in \[1\] eqn. 7.52 .
+///
+/// # References
+///
+/// \[1\] E. M. Purcell and D. J. Morin, “Electricity and Magnetism,”
+///     Higher Education from Cambridge University Press. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://www.cambridge.org/highereducation/books/electricity-and-magnetism/0F97BB6C5D3A56F19B9835EDBEAB087C
+///
+/// \[2\] “Magnetic vector potential,” Wikipedia. Nov. 26, 2024. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://en.wikipedia.org/w/index.php?title=Magnetic_vector_potential&oldid=1259654939#Magnetic_vector_potential
+///
 /// # Arguments
 ///
 /// * `rznfil`:    (m, m, nondim) r,z-coord and number of turns of circular filament
@@ -697,6 +709,18 @@ pub fn mutual_inductance_circular_to_linear_scalar(
 /// into linear segments and using Neumann's formula.
 /// Assumes all target filaments are connected electrically in series.
 ///
+/// Discussion of the equivalence of the line integral of vector potential and the flux through a
+/// surface (the mutual inductance) can be found in \[1\] eqn. 7.52 .
+///
+/// # References
+///
+/// \[1\] E. M. Purcell and D. J. Morin, “Electricity and Magnetism,”
+///     Higher Education from Cambridge University Press. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://www.cambridge.org/highereducation/books/electricity-and-magnetism/0F97BB6C5D3A56F19B9835EDBEAB087C
+///
+/// \[2\] “Magnetic vector potential,” Wikipedia. Nov. 26, 2024. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://en.wikipedia.org/w/index.php?title=Magnetic_vector_potential&oldid=1259654939#Magnetic_vector_potential
+///
 /// # Arguments
 ///
 /// * `rznfil`:  (m, m, nondim) r,z-coord and number of turns of each circular filament, length `n`
@@ -751,6 +775,18 @@ pub fn mutual_inductance_circular_to_linear(
 /// This method is much faster (~100x typically) than discretizing the circular loop
 /// into linear segments and using Neumann's formula.
 /// Assumes all target filaments are connected electrically in series.
+///
+/// Discussion of the equivalence of the line integral of vector potential and the flux through a
+/// surface (the mutual inductance) can be found in \[1\] eqn. 7.52 .
+///
+/// # References
+///
+/// \[1\] E. M. Purcell and D. J. Morin, “Electricity and Magnetism,”
+///     Higher Education from Cambridge University Press. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://www.cambridge.org/highereducation/books/electricity-and-magnetism/0F97BB6C5D3A56F19B9835EDBEAB087C
+///
+/// \[2\] “Magnetic vector potential,” Wikipedia. Nov. 26, 2024. Accessed: Feb. 10, 2025. [Online].
+///     Available: https://en.wikipedia.org/w/index.php?title=Magnetic_vector_potential&oldid=1259654939#Magnetic_vector_potential
 ///
 /// # Arguments
 ///
