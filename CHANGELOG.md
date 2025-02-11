@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.0.0 2025-02-03
+
+### Added
+
+* Add libm dep for reproducible trig functions
+    * Rust std/core defers to libc or other platform-dependent math libraries for trig functions, which can cause platform-dependent results
+    * libm is a pure rust implementation of most functions from MUSL libm, and is platform-independent to the extent that the processor's implementation of floating point math conforms to IEEE-754
+* Add scalar calculations of vector potential, magnetic field, and poloidal flux of a circular filament extracted from vector loop
+    * Scalar calculations now used as the inner function in the vector loops
+    * This produces no performance regression, and some improvements in a few cases, while improving readability by separating physics from array handling
+* Add `mutual_inductance_circular_to_linear` family of functions for calculating mutual inductance between circular filaments and piecewise-linear paths
+* Add `flux_density_circular_filament_cartesian` family of functions for calculating B-field from circular filaments to points in cartesian coordinates
+* Add `cartesian_to_cylindrical` and `cylindrical_to_cartesian` conversion functions
+* Add `decompose_filament` function for converting the start and end points of a filament to the midpoint and length vector
+* Add `body_force_density_linear_filament` and `body_force_density_circular_filament_cartesian` families of functions for calculating JxB force density
+* Add `mesh_filament` module and `mesh_edge_inductance` function for calculating full inductance matrix over a collection of disjoint segments
+    * Same throughput perf as linear filament inductance for a given input geometry, but allocates for the full NxM output matrix
+    * doc(hidden) for now, as the API is likely to change in the near future to avoid reallocating input data
+* Add `point_source` module with dipole field
+* Add (internal) `testing` module with array-handling utilities for tests
+* Add (internal) macros for checking slice lengths
+
+### Changed
+
+* Use `Slice::fill(0.0)` instead of manually zeroing output arrays
+* Use macro for checking array lengths to reduce repeated code
+* !Consolidate function signatures of circular filament calcs to reduce number of args and group args by physical association
+
+# Changelog
+
 ## 1.1.0 2024-08-20
 
 ### Added

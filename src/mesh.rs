@@ -1,9 +1,70 @@
-//! Meshing and filamentization functions.
+//! Meshing and filamentization functions and data structures.
 use crate::math::{cross3, dot3, rss3};
 use core::f64::consts::PI;
 
 use nalgebra::geometry::Rotation3;
 use nalgebra::Vector3;
+
+use num_traits::{Float, NumCast};
+
+/// Linear segments in cartesian coordinates,
+/// defined in mesh format as references to points.
+#[doc(hidden)] // Might make breaking changes soon
+#[non_exhaustive] // Might add more data fields later, like facets or elements
+pub struct MeshEdgeList<T>
+where
+    T: Float + Send + Sync,
+{
+    /// Points in cartesian coordinates
+    nodes: Vec<(T, T, T)>,
+    /// Line segments defined by the indices of the start and end nodes
+    edges: Vec<(usize, usize)>,
+}
+
+impl<T> MeshEdgeList<T>
+where
+    T: Float + Send + Sync,
+{
+    /// Check validity of segment indices & store
+    pub fn new(nodes: Vec<(T, T, T)>, edges: Vec<(usize, usize)>) -> Result<Self, &'static str> {
+        // Check if node indices are valid
+        let n = nodes.len();
+        if edges
+            .iter()
+            .any(|e| e.0 > n - 1 || e.1 > n - 1 || e.0 == e.1)
+        {
+            return Err("Segment refers to non-existent node or collapsed edge");
+        }
+
+        Ok(Self { nodes, edges })
+    }
+
+    /// Immutable reference to node list
+    pub fn nodes(&self) -> &[(T, T, T)] {
+        &self.nodes[..]
+    }
+
+    /// Immutable reference to edge indices
+    pub fn edges(&self) -> &[(usize, usize)] {
+        &self.edges[..]
+    }
+}
+
+/// Convert a point to f64 values
+///
+/// # Panics
+///
+/// * On encountering a value in the input that is not representable as f64.
+pub(crate) fn convert_point<T>(p: (T, T, T)) -> (f64, f64, f64)
+where
+    T: NumCast,
+{
+    (
+        NumCast::from(p.0).unwrap(),
+        NumCast::from(p.1).unwrap(),
+        NumCast::from(p.2).unwrap(),
+    )
+}
 
 /// Filamentize a helix about an arbitrary piecewise-linear path.
 ///

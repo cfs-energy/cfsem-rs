@@ -47,8 +47,12 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(
-                            flux_circular_filament(&current, &rfil, &zfil, &robs, &zobs, &mut out)
-                                .unwrap(),
+                            flux_circular_filament(
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
+                            )
+                            .unwrap(),
                         )
                     });
                 },
@@ -67,7 +71,9 @@ fn bench_flux_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             flux_circular_filament_par(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
@@ -108,7 +114,7 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
             group.bench_with_input(
                 BenchmarkId::new(
                     format!(
-                        "Poloidal Flux of a Circular Filament\n{} Obs. Point(s)",
+                        "Vector Potential of a Circular Filament\n{} Obs. Point(s)",
                         nobs
                     ),
                     ntot,
@@ -118,7 +124,9 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             vector_potential_circular_filament(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
@@ -129,7 +137,7 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
             group.bench_with_input(
                 BenchmarkId::new(
                     format!(
-                        "Poloidal Flux of a Circular Filament, Parallel\n{} Obs. Point(s)",
+                        "Vector Potential of a Circular Filament, Parallel\n{} Obs. Point(s)",
                         nobs
                     ),
                     ntot,
@@ -139,7 +147,9 @@ fn bench_vector_potential_circular_filament(c: &mut Criterion) {
                     b.iter(|| {
                         black_box(
                             vector_potential_circular_filament_par(
-                                &current, &rfil, &zfil, &robs, &zobs, &mut out,
+                                (&rfil, &zfil, &current),
+                                (&robs, &zobs),
+                                &mut out,
                             )
                             .unwrap(),
                         )
@@ -190,7 +200,9 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament(
-                            &current, &rfil, &zfil, &robs, &zobs, &mut out, &mut out1,
+                            (&rfil, &zfil, &current),
+                            (&robs, &zobs),
+                            (&mut out, &mut out1),
                         ))
                     });
                 },
@@ -208,7 +220,9 @@ fn bench_flux_density_circular_filament(c: &mut Criterion) {
                 |b, &_| {
                     b.iter(|| {
                         black_box(flux_density_circular_filament_par(
-                            &current, &rfil, &zfil, &robs, &zobs, &mut out, &mut out1,
+                            (&rfil, &zfil, &current),
+                            (&robs, &zobs),
+                            (&mut out, &mut out1),
                         ))
                     });
                 },
