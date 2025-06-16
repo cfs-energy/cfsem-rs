@@ -1,5 +1,7 @@
 # cfsem
 
+> This repo has been archived, and the rust library is now combined with the [python repo](https://github.com/cfs-energy/cfsem-py).
+
 [Docs - Rust](https://docs.rs/cfsem) | [Docs - Python](https://cfsem-py.readthedocs.io/)
 
 Quasi-steady electromagnetics including filamentized approximations, Biot-Savart, and Grad-Shafranov.
